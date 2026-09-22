@@ -24,12 +24,12 @@ export function Hero() {
       <motion.div {...rise(0)}>
         <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full ring-1 ring-zinc-200 md:h-40 md:w-40">
           <Image
-            src="/headshot.jpeg"
+            src="/headshot.jpg"
             alt="Agam Iheanyi-Igwe"
             fill
             priority
             sizes="160px"
-            className="object-cover"
+            className="scale-[1.06] object-cover object-[50%_42%]"
           />
         </div>
       </motion.div>

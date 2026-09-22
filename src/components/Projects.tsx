@@ -33,7 +33,9 @@ export function Projects() {
                 {p.title}
               </h3>
               <p className="mt-4 text-[15px] leading-relaxed text-zinc-700">{p.summary}</p>
-              <p className="mt-3 text-[15px] leading-relaxed text-zinc-500">{p.detail}</p>
+              {p.detail && (
+                <p className="mt-3 text-[15px] leading-relaxed text-zinc-500">{p.detail}</p>
+              )}
 
               <div className="mt-6">
                 <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">

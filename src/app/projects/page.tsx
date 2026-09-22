@@ -33,8 +33,8 @@ export default function ProjectsPage() {
               Things I&rsquo;ve built.
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-zinc-600">
-              Personal work, client work and internship work. Where the code is mine and
-              public, the repo is linked.
+              Passion projects, contract work, internships. If the code is public, the
+              repo&rsquo;s linked.
             </p>
           </Reveal>
         </div>

@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Script from "next/script";
 import { gallery } from "@/data/site";
+
+declare global {
+  interface Window {
+    instgrm?: { Embeds: { process: () => void } };
+  }
+}
 
 export function Carousel() {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -55,7 +62,7 @@ export function Carousel() {
 
   if (items.length === 0) {
     return (
-      <div className="flex aspect-[16/10] w-full items-center justify-center rounded-3xl border border-dashed border-zinc-300 bg-sand text-center">
+      <div className="flex h-[460px] w-full items-center justify-center rounded-3xl border border-dashed border-zinc-300 bg-sand text-center md:h-[580px]">
         <p className="max-w-xs px-6 text-[14px] leading-relaxed text-zinc-400">
           Drop photos and clips into <code className="font-mono">/public/out-of-office</code>{" "}
           and list them in <code className="font-mono">src/data/site.ts</code>.
@@ -83,9 +90,22 @@ export function Carousel() {
         {items.map((m) => (
           <figure
             key={m.src}
-            className="relative aspect-[16/10] w-full shrink-0 snap-center overflow-hidden rounded-3xl border border-zinc-200 bg-sand"
+            className="relative h-[460px] w-full shrink-0 snap-center overflow-hidden rounded-3xl border border-zinc-200 bg-sand md:h-[580px]"
           >
-            {m.type === "video" ? (
+            {m.type === "instagram" ? (
+              <div className="h-full w-full overflow-y-auto bg-white">
+                <blockquote
+                  className="instagram-media"
+                  data-instgrm-permalink={m.src}
+                  data-instgrm-version="14"
+                  style={{ margin: "0 auto", maxWidth: 540, width: "100%", border: 0 }}
+                >
+                  <a href={m.src} target="_blank" rel="noopener noreferrer">
+                    View on Instagram
+                  </a>
+                </blockquote>
+              </div>
+            ) : m.type === "video" ? (
               <video
                 src={m.src}
                 poster={m.poster}
@@ -105,17 +125,33 @@ export function Carousel() {
                 onError={() => setBroken((b) => ({ ...b, [m.src]: true }))}
               />
             )}
-            <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-5 pb-4 pt-10 text-left text-white">
-              <span className="text-[15px] font-medium">{m.caption}</span>
-              {m.place && (
-                <span className="ml-2 font-mono text-[11px] uppercase tracking-[0.14em] text-white/70">
-                  {m.place}
+            {m.type === "instagram" ? (
+              <figcaption className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-3">
+                <span className="rounded-full bg-white/90 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500 shadow-sm backdrop-blur">
+                  {m.caption}
                 </span>
-              )}
-            </figcaption>
+              </figcaption>
+            ) : (
+              <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-5 pb-4 pt-10 text-left text-white">
+                <span className="text-[15px] font-medium">{m.caption}</span>
+                {m.place && (
+                  <span className="ml-2 font-mono text-[11px] uppercase tracking-[0.14em] text-white/70">
+                    {m.place}
+                  </span>
+                )}
+              </figcaption>
+            )}
           </figure>
         ))}
       </div>
+
+      {items.some((m) => m.type === "instagram") && (
+        <Script
+          src="https://www.instagram.com/embed.js"
+          strategy="afterInteractive"
+          onReady={() => window.instgrm?.Embeds.process()}
+        />
+      )}
 
       {items.length > 1 && (
         <div className="mt-4 flex items-center justify-between">

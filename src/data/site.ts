@@ -3,7 +3,7 @@ export type Project = {
   title: string;
   kicker: string;
   summary: string;
-  detail: string;
+  detail?: string;
   stack: string[];
   github?: string;
   link?: { label: string; href: string };
@@ -31,10 +31,17 @@ export const projects: Project[] = [
     title: "Omni",
     kicker: "Personal · In progress",
     summary:
-      "A single input that remembers things and answers things. No modes, no buttons — Omni infers whether what you said is worth keeping or is a question about what you already told it.",
-    detail:
-      "Local-first: notes live in SQLite on your own machine and nothing leaves it except the model calls needed to classify intent and search. Throwaway input is caught by a local pre-filter before any API call. Ask about something it has nothing on and it falls back to general knowledge instead of coming up empty. Wake-word capture over a Raspberry Pi is next.",
-    stack: ["Next.js", "TypeScript", "SQLite", "shadcn/ui", "Claude API", "Hugging Face"],
+      "Using AR wearables to rebuild Jarvis from Iron Man.",
+    stack: [
+      "Anthropic Claude",
+      "ElevenLabs",
+      "n8n",
+      "MCP",
+      "Hugging Face",
+      "whisper.cpp",
+      "Next.js",
+      "SQLite",
+    ],
     github: "https://github.com/lag-gam/omni",
     mock: "bar",
   },
@@ -45,7 +52,7 @@ export const projects: Project[] = [
     summary:
       "Contract observability and tracing tooling for Godela (YC X25), a physics-AI simulation platform. On-call engineers were opening five consoles to answer one question; now a job ID answers it.",
     detail:
-      "Trace propagation across service boundaries, unified job timelines, and error reporting wired into the same view rather than a separate tool nobody checks. The hard half was never collection — every system already had the data. It was agreeing on an identifier and presenting the result in the order a person reasons about it.",
+      "Trace propagation across services, unified job timelines, and error reporting in the same view. Every system already had the data; the work was agreeing on an identifier and showing it in the order a person reasons about it.",
     stack: ["Python", "Kubernetes", "AWS", "Terraform", "Grafana / Loki", "Sentry"],
     mock: "terminal",
   },
@@ -65,9 +72,9 @@ export const projects: Project[] = [
     title: "AskDolph",
     kicker: "Personal · Summer 2025",
     summary:
-      "An emotional intelligence app for ambiguous conversations. Upload a screenshot of a thread and it reads the signals in it, then says what it thinks is happening and what you might do next.",
+      "A relationship assistant that keeps a profile of everyone you talk to, so you don't have to. Picking a conversation back up, working out what to say, checking how compatible you actually are.",
     detail:
-      "Output is deliberately fixed at two or three short insights, an optional forecast, and one suggestion — an assistant that answers at essay length is one nobody opens twice. Persistent memory means a new screenshot is read in the context of the ones before it, which was the hardest part to keep bounded.",
+      "Screenshot a thread and it reads the signals in it, then says what it thinks is happening and what you might do next. Profiles build over time, so each new conversation is read against every one before it.",
     stack: ["React Native", "Expo", "NativeWind", "Supabase", "OpenAI"],
     mock: "phone",
   },
@@ -85,6 +92,17 @@ export type Role = {
 };
 
 export const roles: Role[] = [
+  {
+    when: "Fall 2026",
+    title: "Teaching Assistant, CS193T",
+    org: "Stanford CS",
+    logo: "/logos/stanford.webp",
+    url: "https://web.stanford.edu/class/archive/cs/cs193t/cs193t.1272/",
+    bullets: [
+      "TA for Thinking with AI, where students spend the quarter building a portfolio-ready AI system for their own field.",
+      "Track each student's project end to end as they build with frontier agents, from weekly model comparisons to accuracy safeguards.",
+    ],
+  },
   {
     when: "Jun 2026 — Sep 2026",
     title: "SWE Intern, Infrastructure",
@@ -117,19 +135,8 @@ export const roles: Role[] = [
     ],
   },
   {
-    when: "Fall 2026",
-    title: "Undergraduate Teaching Assistant, CS193T",
-    org: "Stanford CS",
-    logo: "/logos/stanford.webp",
-    url: "https://web.stanford.edu/class/archive/cs/cs193t/cs193t.1272/",
-    bullets: [
-      "TA for Thinking with AI, where students spend the quarter building a portfolio-ready AI system for their own field.",
-      "Track each student's project end to end as they build with frontier agents, from weekly model comparisons to accuracy safeguards.",
-    ],
-  },
-  {
     when: "2024 — Present",
-    title: "Undergraduate Teaching Assistant, CS198",
+    title: "Teaching Assistant, CS198",
     org: "Stanford CS",
     logo: "/logos/stanford.webp",
     url: "https://cs198.stanford.edu/web",
@@ -169,9 +176,9 @@ export const site = {
 };
 
 export type MediaItem = {
-  /** file in /public/out-of-office */
+  /** file in /public/out-of-office, or an Instagram permalink when type is "instagram" */
   src: string;
-  type: "image" | "video";
+  type: "image" | "video" | "instagram";
   /** poster frame for videos — also a file in /public/out-of-office */
   poster?: string;
   caption: string;
@@ -183,15 +190,20 @@ export type MediaItem = {
  * Anything missing from disk is skipped at render time rather than breaking.
  */
 export const gallery: MediaItem[] = [
-  { src: "/out-of-office/rio-1.jpg", type: "image", caption: "Rio de Janeiro", place: "Brazil" },
-  { src: "/out-of-office/houston-1.jpg", type: "image", caption: "Texas Greek Picnic", place: "Houston" },
-  { src: "/out-of-office/sf-1.jpg", type: "image", caption: "Thrifting downtown", place: "San Francisco" },
-  { src: "/out-of-office/climb-1.jpg", type: "image", caption: "Midweek climbing session", place: "Bay Area" },
   {
-    src: "/out-of-office/travel-vlog-1.mp4",
-    type: "video",
-    poster: "/out-of-office/travel-vlog-1.jpg",
-    caption: "Travel vlog",
+    src: "https://www.instagram.com/p/DWwo83Lj1BI/",
+    type: "instagram",
+    caption: "Yosemite",
+  },
+  {
+    src: "https://www.instagram.com/p/DYefCiavsjE/",
+    type: "instagram",
+    caption: "Rio de Janeiro",
+  },
+  {
+    src: "https://www.instagram.com/p/C9cys4ovSDQ/",
+    type: "instagram",
+    caption: "Seattle",
   },
 ];
 
