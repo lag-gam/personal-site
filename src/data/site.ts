@@ -231,3 +231,8 @@ export const interests = [
   "Travel vlogs",
   "Venture capital",
 ];
+
+/** Shown when the Spotify API isn't reachable. Playlist ID is the part after /playlist/ in a share link. */
+export const fallbackPlaylists = [
+  { id: "0G2KJ70HBrdOCe1wJgSxec", name: "" },
+];

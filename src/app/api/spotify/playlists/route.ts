@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
-const TOP_URL =
-  "https://api.spotify.com/v1/me/top/tracks?limit=5&time_range=short_term";
+const LIST_URL = "https://api.spotify.com/v1/me/playlists?limit=50";
 
-type SpotifyTrack = {
+type SpotifyPlaylist = {
+  id: string;
   name: string;
-  external_urls: { spotify: string };
-  artists: { name: string }[];
-  album: { name: string; images: { url: string; width: number }[] };
+  description: string;
+  public: boolean;
+  owner: { id: string };
+  tracks: { total: number };
 };
 
 async function accessToken(id: string, secret: string, refresh: string) {
@@ -28,38 +29,39 @@ async function accessToken(id: string, secret: string, refresh: string) {
   return json.access_token;
 }
 
-export const revalidate = 3600; // refresh at most once an hour
+export const revalidate = 3600;
 
 export async function GET() {
   const id = process.env.SPOTIFY_CLIENT_ID;
   const secret = process.env.SPOTIFY_CLIENT_SECRET;
   const refresh = process.env.SPOTIFY_REFRESH_TOKEN;
 
-  // Not wired up yet: answer cleanly so the UI can show a neutral state.
   if (!id || !secret || !refresh) {
-    return NextResponse.json({ configured: false, tracks: [] });
+    return NextResponse.json({ configured: false, playlists: [] });
   }
 
   try {
     const token = await accessToken(id, secret, refresh);
-    const res = await fetch(TOP_URL, {
+    const res = await fetch(LIST_URL, {
       headers: { Authorization: `Bearer ${token}` },
       next: { revalidate },
     });
-    if (!res.ok) throw new Error(`top tracks ${res.status}`);
+    // 403 means the refresh token predates the playlist-read-private scope.
+    if (!res.ok) throw new Error(`playlists ${res.status}`);
 
-    const json = (await res.json()) as { items?: SpotifyTrack[] };
-    const tracks = (json.items ?? []).map((t) => ({
-      name: t.name,
-      artists: t.artists.map((a) => a.name).join(", "),
-      album: t.album.name,
-      url: t.external_urls.spotify,
-      image: t.album.images.at(-1)?.url ?? t.album.images[0]?.url ?? null,
-    }));
+    const json = (await res.json()) as { items?: SpotifyPlaylist[] };
+    const playlists = (json.items ?? [])
+      .filter((p) => p.public && p.tracks.total > 0)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        tracks: p.tracks.total,
+      }));
 
-    return NextResponse.json({ configured: true, tracks });
+    return NextResponse.json({ configured: true, playlists });
   } catch (err) {
-    console.error("[spotify]", err);
-    return NextResponse.json({ configured: true, tracks: [], error: true }, { status: 200 });
+    console.error("[spotify playlists]", err);
+    return NextResponse.json({ configured: true, playlists: [], error: true });
   }
 }

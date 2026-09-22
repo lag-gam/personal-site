@@ -90,10 +90,14 @@ export function Carousel() {
         {items.map((m) => (
           <figure
             key={m.src}
-            className="relative h-[460px] w-full shrink-0 snap-center overflow-hidden rounded-3xl border border-zinc-200 bg-sand md:h-[580px]"
+            className={
+              m.type === "instagram"
+                ? "relative h-[600px] w-full max-w-[540px] shrink-0 snap-center overflow-hidden"
+                : "relative h-[460px] w-full shrink-0 snap-center overflow-hidden rounded-3xl border border-zinc-200 bg-sand md:h-[580px]"
+            }
           >
             {m.type === "instagram" ? (
-              <div className="h-full w-full overflow-y-auto bg-white">
+              <div className="h-full w-full overflow-y-auto">
                 <blockquote
                   className="instagram-media"
                   data-instgrm-permalink={m.src}
@@ -125,13 +129,7 @@ export function Carousel() {
                 onError={() => setBroken((b) => ({ ...b, [m.src]: true }))}
               />
             )}
-            {m.type === "instagram" ? (
-              <figcaption className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-3">
-                <span className="rounded-full bg-white/90 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500 shadow-sm backdrop-blur">
-                  {m.caption}
-                </span>
-              </figcaption>
-            ) : (
+            {m.type === "instagram" ? null : (
               <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-5 pb-4 pt-10 text-left text-white">
                 <span className="text-[15px] font-medium">{m.caption}</span>
                 {m.place && (

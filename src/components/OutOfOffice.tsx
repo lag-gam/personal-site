@@ -1,6 +1,7 @@
 import { involvements, interests, site } from "@/data/site";
 import { Carousel } from "./Carousel";
 import { SpotifyTop } from "./SpotifyTop";
+import { Playlists } from "./Playlists";
 import { Reveal } from "./Reveal";
 
 export function OutOfOffice() {
@@ -36,6 +37,12 @@ export function OutOfOffice() {
 
           <Reveal delay={0.08}>
             <SpotifyTop />
+          </Reveal>
+        </div>
+
+        <div className="mt-6">
+          <Reveal>
+            <Playlists />
           </Reveal>
         </div>
 
