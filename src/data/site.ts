@@ -193,7 +193,7 @@ export const gallery: MediaItem[] = [
   {
     src: "https://www.instagram.com/p/DWwo83Lj1BI/",
     type: "instagram",
-    caption: "Yosemite",
+    caption: "Yosemite, California",
   },
   {
     src: "https://www.instagram.com/p/DYefCiavsjE/",
@@ -213,7 +213,7 @@ export const gallery: MediaItem[] = [
   {
     src: "https://www.instagram.com/p/C9cys4ovSDQ/",
     type: "instagram",
-    caption: "Seattle",
+    caption: "Seattle, Washington",
   },
 ];
 
@@ -242,7 +242,10 @@ export const interests = [
   "Venture capital",
 ];
 
-/** Shown when the Spotify API isn't reachable. Playlist ID is the part after /playlist/ in a share link. */
-export const fallbackPlaylists = [
-  { id: "0G2KJ70HBrdOCe1wJgSxec", name: "" },
+/** Playlist ID is the part after /playlist/ in a share link. Order here is the order shown. */
+export const playlists = [
+  { id: "0G2KJ70HBrdOCe1wJgSxec" },
+  { id: "6y1coLJU1hDPMxLwZomjtI" },
+  { id: "52VlLSTlwQCBA4KMAeqHje" },
+  { id: "2D8b2zB97zN8FtAZKy7adg" },
 ];

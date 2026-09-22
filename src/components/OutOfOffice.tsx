@@ -4,21 +4,28 @@ import { NowPlaying } from "./NowPlaying";
 import { Playlists } from "./Playlists";
 import { Reveal } from "./Reveal";
 
+function Heading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="mb-6 text-xl font-semibold tracking-tight text-ink md:text-2xl">
+      {children}
+    </h3>
+  );
+}
+
 export function OutOfOffice() {
   return (
     <section id="out-of-office" className="border-t border-zinc-200 bg-sand py-24 md:py-32">
       <div className="mx-auto w-full max-w-[1200px] px-5 md:px-8">
         <Reveal>
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-forest">
-            Out of Office
-          </p>
-          <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-ink md:text-4xl">
+          <h2 className="max-w-2xl text-3xl font-semibold tracking-tight text-ink md:text-4xl">
             What I&rsquo;m doing when I&rsquo;m not doing this.
           </h2>
         </Reveal>
 
-        <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr] lg:gap-8">
+        {/* travel */}
+        <div className="mt-14 border-t border-zinc-200 pt-10">
           <Reveal>
+            <Heading>Where I&rsquo;ve been</Heading>
             <Carousel />
             {site.instagram && (
               <a
@@ -27,26 +34,30 @@ export function OutOfOffice() {
                 rel="noopener noreferrer"
                 className="group mt-4 inline-flex items-center text-[14px] text-zinc-500 hover:text-forest"
               >
-                More on Instagram
+                See more
                 <span className="ml-1 inline-block transition-transform group-hover:translate-x-1">
                   →
                 </span>
               </a>
             )}
           </Reveal>
-
-          <Reveal delay={0.08}>
-            <NowPlaying />
-          </Reveal>
         </div>
 
-        <div className="mt-6">
+        {/* music */}
+        <div className="mt-14 border-t border-zinc-200 pt-10">
           <Reveal>
-            <Playlists />
+            <Heading>What I&rsquo;m listening to rn</Heading>
+            <div className="max-w-md">
+              <NowPlaying />
+            </div>
+            <div className="mt-4">
+              <Playlists />
+            </div>
           </Reveal>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr] lg:gap-8">
+        {/* campus + interests */}
+        <div className="mt-14 grid grid-cols-1 gap-6 border-t border-zinc-200 pt-10 lg:grid-cols-[1.5fr_1fr] lg:gap-8">
           <Reveal>
             <div className="rounded-3xl border border-zinc-200 bg-white p-5 md:p-6">
               <h3 className="text-lg font-medium tracking-tight text-ink">On campus</h3>
