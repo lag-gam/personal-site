@@ -27,7 +27,19 @@ export function Experience() {
                 </div>
                 <div>
                   <h3 className="text-lg font-medium tracking-tight text-ink md:text-xl">
-                    {r.title} <span className="text-zinc-400">· {r.org}</span>
+                    {r.title}{" "}
+                    {r.url ? (
+                      <a
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-zinc-400 underline-offset-4 transition-colors hover:text-forest hover:underline"
+                      >
+                        · {r.org}
+                      </a>
+                    ) : (
+                      <span className="text-zinc-400">· {r.org}</span>
+                    )}
                   </h3>
                   <ul className="mt-3 space-y-2">
                     {r.bullets.map((b) => (

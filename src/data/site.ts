@@ -79,6 +79,8 @@ export type Role = {
   org: string;
   /** file in /public/logos — swap or add your own */
   logo?: string;
+  /** makes the org name a link */
+  url?: string;
   bullets: string[];
 };
 
@@ -107,20 +109,33 @@ export const roles: Role[] = [
     when: "Mar 2025 — Present",
     title: "Software Engineer",
     org: "Burton Algorithms",
-    logo: "/logos/burton.png",
+    logo: "/logos/burton.jpg",
+    url: "https://burtonalgorithms.com/",
     bullets: [
       "Contract work building security and observability infrastructure for early-stage startups.",
       "Built observability and tracing tooling across AWS, Kubernetes and Grafana/Loki for Godela (YC X25), a physics-AI simulation platform.",
     ],
   },
   {
-    when: "2024 — Present",
-    title: "Section Leader, CS106 / CS198",
+    when: "Fall 2026",
+    title: "Undergraduate Teaching Assistant, CS193T",
     org: "Stanford CS",
     logo: "/logos/stanford.webp",
+    url: "https://web.stanford.edu/class/archive/cs/cs193t/cs193t.1272/",
     bullets: [
-      "Weekly sections and office hours for Stanford's intro programming sequence, supporting 900+ students in Python and C++.",
-      "Work with faculty on lesson plans, assignments and exams.",
+      "TA for Thinking with AI, where students spend the quarter building a portfolio-ready AI system for their own field.",
+      "Track each student's project end to end as they build with frontier agents, from weekly model comparisons to accuracy safeguards.",
+    ],
+  },
+  {
+    when: "2024 — Present",
+    title: "Undergraduate Teaching Assistant, CS198",
+    org: "Stanford CS",
+    logo: "/logos/stanford.webp",
+    url: "https://cs198.stanford.edu/web",
+    bullets: [
+      "TA Stanford's introductory programming and data structures sequence, supporting 900+ students in Python and C++.",
+      "Run weekly sections and office hours, and work with faculty on lesson plans, assignments and exams.",
     ],
   },
   {
