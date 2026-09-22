@@ -9,7 +9,7 @@ export function Contact() {
     >
       <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[60%] bg-gradient-to-t from-forest-wash to-transparent" />
       <div className="mx-auto max-w-2xl px-5">
-        <Reveal>
+        <Reveal variant="blur">
           <h2 className="text-3xl font-semibold tracking-tight text-ink md:text-4xl">
             Reach out to chat.
           </h2>

@@ -24,7 +24,7 @@ export function OutOfOffice() {
 
         {/* travel */}
         <div className="mt-14 border-t border-zinc-200 pt-10">
-          <Reveal>
+          <Reveal variant="blur">
             <Heading>Where I&rsquo;ve been</Heading>
             <Carousel />
             {site.instagram && (
@@ -45,9 +45,9 @@ export function OutOfOffice() {
 
         {/* music */}
         <div className="mt-14 border-t border-zinc-200 pt-10">
-          <Reveal>
+          <Reveal variant="blur">
             <Heading>What I&rsquo;m listening to rn</Heading>
-            <div className="max-w-md">
+            <div className="mx-auto max-w-md">
               <NowPlaying />
             </div>
             <div className="mt-4">

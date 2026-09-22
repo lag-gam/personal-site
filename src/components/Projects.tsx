@@ -2,12 +2,13 @@ import Image from "next/image";
 import { projects } from "@/data/site";
 import { Mock } from "./Mock";
 import { Reveal } from "./Reveal";
+import { Parallax } from "./Parallax";
 
 export function Projects() {
   return (
     <div className="space-y-6 md:space-y-8">
       {projects.map((p, i) => (
-        <Reveal key={p.slug} delay={i === 0 ? 0 : 0.04}>
+        <Reveal key={p.slug} delay={i === 0 ? 0 : 0.04} variant="scale">
           <article className="group grid grid-cols-1 gap-6 overflow-hidden rounded-3xl border border-zinc-200 bg-white p-4 transition-all duration-500 hover:border-forest/40 hover:shadow-[0_18px_50px_-30px_rgba(20,83,45,0.35)] md:grid-cols-2 md:gap-10 md:p-6">
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-sand">
               {p.image ? (
@@ -19,9 +20,9 @@ export function Projects() {
                   className="object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.02]"
                 />
               ) : (
-                <div className="h-full w-full p-3 transition-transform duration-700 ease-out group-hover:scale-[1.015]">
+                <Parallax distance={18} className="h-full w-full p-3">
                   <Mock kind={p.mock} />
-                </div>
+                </Parallax>
               )}
             </div>
 

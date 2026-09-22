@@ -6,7 +6,7 @@ export function Experience() {
   return (
     <section id="experience" className="border-t border-zinc-200 bg-white py-24 md:py-32">
       <div className="mx-auto w-full max-w-[1200px] px-5 md:px-8">
-        <Reveal>
+        <Reveal variant="blur">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-forest">
             Experience
           </p>
