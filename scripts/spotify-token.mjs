@@ -12,7 +12,8 @@ import { createServer } from "node:http";
 const ID = process.env.SPOTIFY_CLIENT_ID;
 const SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT = "http://127.0.0.1:8888/callback";
-const SCOPE = "user-top-read playlist-read-private";
+const SCOPE =
+  "user-top-read playlist-read-private user-read-currently-playing user-read-recently-played";
 
 if (!ID || !SECRET) {
   console.error("Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET first.");

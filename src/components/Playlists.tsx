@@ -27,7 +27,7 @@ export function Playlists() {
   return (
     <div>
       <div className="flex items-baseline justify-between">
-        <h3 className="text-lg font-medium tracking-tight text-ink">Lemme put y&rsquo;all on</h3>
+        <h3 className="text-lg font-medium tracking-tight text-ink">What I&rsquo;m listening to rn</h3>
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400">
           Public playlists
         </span>

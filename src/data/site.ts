@@ -198,7 +198,17 @@ export const gallery: MediaItem[] = [
   {
     src: "https://www.instagram.com/p/DYefCiavsjE/",
     type: "instagram",
-    caption: "Rio de Janeiro",
+    caption: "Rio de Janeiro, Brazil",
+  },
+  {
+    src: "https://www.instagram.com/p/DWuxt7EGleq/",
+    type: "instagram",
+    caption: "Rio de Janeiro, Brazil",
+  },
+  {
+    src: "https://www.instagram.com/p/C44T3YJySdw/",
+    type: "instagram",
+    caption: "Tokyo, Japan",
   },
   {
     src: "https://www.instagram.com/p/C9cys4ovSDQ/",
