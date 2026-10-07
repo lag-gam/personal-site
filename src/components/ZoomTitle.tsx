@@ -1,16 +1,16 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { motion, useReducedMotion, useTransform } from "motion/react";
+import { usePinProgress } from "./usePinProgress";
 
 /*
-  A full-screen chapter card. The title rises in small, settles at full size,
-  then zooms toward the viewer and dissolves as you scroll through it into the
-  section below. Same "push in" feel as the hero.
+  A full-screen chapter card. The title rises in small and blurred, then zooms
+  up to full size as you scroll and stays put until the page carries it away.
 
-  Progress runs from the wrapper's top hitting the bottom of the viewport (0)
-  to its bottom hitting the bottom of the viewport (1). With a 240vh wrapper the
-  stage is pinned from ~0.42 to 1.
+  Progress runs from the wrapper's top entering at the bottom of the viewport (0)
+  to its bottom reaching the bottom of the viewport (1). With a 200vh wrapper the
+  stage is pinned from 0.5 to 1.
 */
 export function ZoomTitle({
   id,
@@ -25,17 +25,14 @@ export function ZoomTitle({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
-  const { scrollYProgress: p } = useScroll({
-    target: ref,
-    offset: ["start end", "end end"],
-  });
+  const p = usePinProgress(ref, "enter");
 
-  const scale = useTransform(p, [0, 0.42, 0.62, 1], [0.55, 1, 1, 6]);
-  const opacity = useTransform(p, [0.05, 0.38, 0.72, 0.92], [0, 1, 1, 0]);
-  const blurPx = useTransform(p, [0.05, 0.36, 0.7, 0.95], [14, 0, 0, 18]);
+  const scale = useTransform(p, [0.1, 0.85], [0.45, 1]);
+  const opacity = useTransform(p, [0.1, 0.4], [0, 1]);
+  const blurPx = useTransform(p, [0.1, 0.5], [12, 0]);
   const filter = useTransform(blurPx, (b) => `blur(${b}px)`);
-  const eyebrowOpacity = useTransform(p, [0.3, 0.42, 0.6, 0.68], [0, 1, 1, 0]);
-  const eyebrowY = useTransform(p, [0.3, 0.42], [12, 0]);
+  const eyebrowOpacity = useTransform(p, [0.45, 0.6], [0, 1]);
+  const eyebrowY = useTransform(p, [0.45, 0.6], [12, 0]);
 
   const bg = tone === "sand" ? "bg-sand" : "bg-white";
 
@@ -53,7 +50,7 @@ export function ZoomTitle({
   }
 
   return (
-    <div ref={ref} id={id} className={`relative h-[240vh] ${bg}`}>
+    <div ref={ref} id={id} className={`relative h-[200vh] ${bg}`}>
       <div className="sticky top-0 flex h-[100svh] items-center justify-center overflow-hidden px-5">
         <div className="flex flex-col items-center text-center">
           {eyebrow && (
