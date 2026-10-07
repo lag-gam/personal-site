@@ -1,14 +1,19 @@
 import Image from "next/image";
 import { projects } from "@/data/site";
 import { Mock } from "./Mock";
-import { Reveal } from "./Reveal";
 import { Parallax } from "./Parallax";
+import { SlideIn } from "./ScrollScene";
 
 export function Projects() {
   return (
     <div className="space-y-6 md:space-y-8">
       {projects.map((p, i) => (
-        <Reveal key={p.slug} delay={i === 0 ? 0 : 0.04} variant="scale">
+        <SlideIn
+          key={p.slug}
+          from={i % 2 === 0 ? "left" : "right"}
+          distance={110}
+          rotate={i % 2 === 0 ? -1.2 : 1.2}
+        >
           <article className="group grid grid-cols-1 gap-6 overflow-hidden rounded-3xl border border-zinc-200 bg-white p-4 transition-all duration-500 hover:border-forest/40 hover:shadow-[0_18px_50px_-30px_rgba(20,83,45,0.35)] md:grid-cols-2 md:gap-10 md:p-6">
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-sand">
               {p.image ? (
@@ -69,13 +74,11 @@ export function Projects() {
                   </a>
                 </div>
               ) : (
-                <p className="mt-6 text-[13px] text-zinc-400">
-                  Private — company or client codebase.
-                </p>
+                <p className="mt-6 text-[13px] text-zinc-400">Private repo.</p>
               )}
             </div>
           </article>
-        </Reveal>
+        </SlideIn>
       ))}
     </div>
   );

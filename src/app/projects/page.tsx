@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Projects } from "@/components/Projects";
 import { Reveal } from "@/components/Reveal";
+import { Wipe } from "@/components/ScrollScene";
 import { site } from "@/data/site";
 
 export const metadata: Metadata = {
@@ -29,9 +30,11 @@ export default function ProjectsPage() {
             <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-forest">
               Projects
             </p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-ink md:text-6xl">
-              Things I&rsquo;ve built.
-            </h1>
+            <Wipe>
+              <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-ink md:text-6xl">
+                Things I&rsquo;ve built.
+              </h1>
+            </Wipe>
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-zinc-600">
               Passion projects, contract work, internships. If the code is public, the
               repo&rsquo;s linked.

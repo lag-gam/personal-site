@@ -1,23 +1,19 @@
 import { roles } from "@/data/site";
 import { Logo } from "./Logo";
-import { Reveal } from "./Reveal";
+import { SlideIn } from "./ScrollScene";
+import { ZoomTitle } from "./ZoomTitle";
 
 export function Experience() {
   return (
-    <section id="experience" className="border-t border-zinc-200 bg-white py-24 md:py-32">
+    <>
+    <ZoomTitle id="experience" eyebrow="Experience">
+      Where I&rsquo;ve worked.
+    </ZoomTitle>
+    <section className="bg-white pb-24 md:pb-32">
       <div className="mx-auto w-full max-w-[1200px] px-5 md:px-8">
-        <Reveal variant="blur">
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-forest">
-            Experience
-          </p>
-          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink md:text-4xl">
-            Where I&rsquo;ve worked.
-          </h2>
-        </Reveal>
-
-        <div className="mt-14 border-t border-zinc-200">
+        <div className="border-t border-zinc-200">
           {roles.map((r, i) => (
-            <Reveal key={`${r.org}-${r.when}`} delay={i === 0 ? 0 : 0.03}>
+            <SlideIn key={`${r.org}-${r.when}`} from="left" distance={70}>
               <div className="grid grid-cols-1 gap-4 border-b border-zinc-200 py-8 transition-colors duration-300 hover:bg-sand md:grid-cols-[200px_1fr] md:gap-10 md:px-4">
                 <div className="flex items-start gap-3">
                   <Logo src={r.logo} name={r.org} />
@@ -53,10 +49,11 @@ export function Experience() {
                   </ul>
                 </div>
               </div>
-            </Reveal>
+            </SlideIn>
           ))}
         </div>
       </div>
     </section>
+    </>
   );
 }

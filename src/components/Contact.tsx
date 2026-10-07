@@ -1,18 +1,20 @@
 import { site } from "@/data/site";
 import { Reveal } from "./Reveal";
+import { ZoomTitle } from "./ZoomTitle";
 
 export function Contact() {
   return (
-    <section
-      id="contact"
-      className="relative overflow-hidden border-t border-zinc-200 bg-white py-24 text-center md:py-28"
-    >
+    <>
+    <ZoomTitle id="contact" eyebrow="Contact">
+      Reach out to chat.
+    </ZoomTitle>
+    <section className="relative overflow-hidden bg-white pb-24 text-center md:pb-28">
       <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[60%] bg-gradient-to-t from-forest-wash to-transparent" />
       <div className="mx-auto max-w-2xl px-5">
         <Reveal variant="blur">
-          <h2 className="text-3xl font-semibold tracking-tight text-ink md:text-4xl">
-            Reach out to chat.
-          </h2>
+          <p className="text-lg text-zinc-600 md:text-xl">
+            Always happy to talk infra, security, or whatever you&rsquo;re building.
+          </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <a
               href={`mailto:${site.email}`}
@@ -32,5 +34,6 @@ export function Contact() {
         </Reveal>
       </div>
     </section>
+    </>
   );
 }
