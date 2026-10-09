@@ -57,13 +57,13 @@ export default function ProjectsPage() {
               href={site.resume}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-full bg-forest px-6 py-3 text-[15px] font-medium text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-forest-soft"
+              className="rounded-full bg-forest px-6 py-3 text-[15px] font-medium text-white transition-colors duration-200 hover:bg-forest-soft"
             >
               View Resume
             </a>
             <Link
               href="/#contact"
-              className="rounded-full border border-zinc-300 px-6 py-3 text-[15px] font-medium text-ink transition-all duration-300 hover:-translate-y-0.5 hover:border-forest hover:text-forest"
+              className="rounded-full border border-zinc-300 px-6 py-3 text-[15px] font-medium text-ink transition-colors duration-200 hover:border-forest hover:text-forest"
             >
               Get in touch
             </Link>

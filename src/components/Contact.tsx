@@ -18,7 +18,7 @@ export function Contact() {
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <a
               href={`mailto:${site.email}`}
-              className="rounded-full bg-forest px-6 py-3 text-[15px] font-medium text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-forest-soft"
+              className="rounded-full bg-forest px-6 py-3 text-[15px] font-medium text-white transition-colors duration-200 hover:bg-forest-soft"
             >
               Contact me
             </a>
@@ -26,7 +26,7 @@ export function Contact() {
               href={site.linkedin}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-full border border-zinc-300 px-6 py-3 text-[15px] font-medium text-ink transition-all duration-300 hover:-translate-y-0.5 hover:border-forest hover:text-forest"
+              className="rounded-full border border-zinc-300 px-6 py-3 text-[15px] font-medium text-ink transition-colors duration-200 hover:border-forest hover:text-forest"
             >
               LinkedIn
             </a>

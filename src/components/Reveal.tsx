@@ -3,38 +3,31 @@
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
-const EASE = [0.16, 1, 0.3, 1] as const;
-
-type Variant = "rise" | "blur" | "scale";
-
-const variants = {
-  rise: { from: { opacity: 0, y: 28 }, to: { opacity: 1, y: 0 } },
-  blur: { from: { opacity: 0, y: 24, filter: "blur(10px)" }, to: { opacity: 1, y: 0, filter: "blur(0px)" } },
-  scale: { from: { opacity: 0, scale: 0.965, y: 20 }, to: { opacity: 1, scale: 1, y: 0 } },
-};
-
+/*
+  The site's only entrance motion: a short, opacity-only fade the first time a
+  block comes into view. No movement, scaling or blur. `variant` is accepted for
+  older call sites and ignored.
+*/
 export function Reveal({
   children,
   delay = 0,
   className = "",
-  variant = "rise",
 }: {
   children: ReactNode;
   delay?: number;
   className?: string;
-  variant?: Variant;
+  variant?: "rise" | "blur" | "scale";
 }) {
   const reduced = useReducedMotion();
-  const v = variants[variant];
 
   if (reduced) return <div className={className}>{children}</div>;
 
   return (
     <motion.div
-      initial={v.from}
-      whileInView={v.to}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.85, delay, ease: EASE }}
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.5, delay, ease: "easeOut" }}
       className={className}
     >
       {children}

@@ -22,7 +22,7 @@ export function Projects() {
                   alt={`${p.title} screenshot`}
                   fill
                   sizes="(max-width: 768px) 100vw, 560px"
-                  className="object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.02]"
+                  className="object-cover object-top"
                 />
               ) : (
                 <Parallax distance={18} className="h-full w-full p-3">
