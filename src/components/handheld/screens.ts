@@ -604,9 +604,9 @@ function home(
   tagline: { text: string; caret: boolean }
 ) {
   // 4:3 screen: face centered on top, greeting typing underneath
-  const size = 330;
+  const size = 410;
   const fx = (TOP_W - size) / 2;
-  const fy = 150;
+  const fy = 140;
   if (face) cover(ctx, face, fx, fy, size, size, 40);
   else placeholder(ctx, fx, fy, size, size, 40);
   rr(ctx, fx, fy, size, size, 40);
@@ -618,19 +618,19 @@ function home(
   ctx.font = `700 112px ${FONT}`;
   const full = ctx.measureText("Hi, I\u2019m Agam").width;
   const gx = (TOP_W - full) / 2; // anchor at the finished width so it doesn't slide while typing
-  ctx.fillText(greeting, gx, 590);
+  ctx.fillText(greeting, gx, 655);
   if (caret) {
     const x = gx + ctx.measureText(greeting).width + 10;
     ctx.fillStyle = GREEN;
-    ctx.fillRect(x, 545, 10, 92);
+    ctx.fillRect(x, 610, 10, 92);
   }
   // tagline types in under the greeting, left-aligned with it so it grows rightward
   ctx.fillStyle = MUTED;
   ctx.font = `500 44px ${FONT}`;
-  ctx.fillText(tagline.text, gx + 4, 690);
+  ctx.fillText(tagline.text, gx + 4, 762);
   if (tagline.caret) {
     ctx.fillStyle = GREEN;
-    ctx.fillRect(gx + 4 + ctx.measureText(tagline.text).width + 6, 666, 6, 50);
+    ctx.fillRect(gx + 4 + ctx.measureText(tagline.text).width + 6, 738, 6, 50);
   }
 
 }

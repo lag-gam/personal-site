@@ -26,7 +26,7 @@ const LID_T = 0.11;
 const OPEN_DEG = 112;
 const FLAT_DEG = 180;
 
-const SHELL = "#b0121c"; // metallic candy red
+const SHELL = "#b8161f"; // matte red
 const INNER = "#121314"; // glossy black bezel
 const DARK = "#1d1e20";
 
@@ -509,12 +509,12 @@ function Device({
 
   /* ---------- materials ---------- */
 
-  // metallic red under a glossy clearcoat, like car paint: metal flake base, mirror coat on top
+  // matte red: a satin finish with a little metal in it, soft highlights instead of mirror ones
   const shell = (
-    <meshPhysicalMaterial color={SHELL} metalness={0.8} roughness={0.3} clearcoat={1} clearcoatRoughness={0.03} envMapIntensity={1.4} />
+    <meshPhysicalMaterial color={SHELL} metalness={0.35} roughness={0.58} clearcoat={0.12} clearcoatRoughness={0.7} envMapIntensity={0.9} />
   );
-  const inner = <meshPhysicalMaterial color={INNER} roughness={0.3} metalness={0.05} clearcoat={0.8} clearcoatRoughness={0.08} />;
-  const dark = <meshPhysicalMaterial color={DARK} roughness={0.28} metalness={0.3} clearcoat={1} clearcoatRoughness={0.05} />;
+  const inner = <meshPhysicalMaterial color={INNER} roughness={0.62} metalness={0.05} clearcoat={0.1} clearcoatRoughness={0.8} />;
+  const dark = <meshPhysicalMaterial color={DARK} roughness={0.55} metalness={0.1} clearcoat={0.15} clearcoatRoughness={0.7} />;
 
   return (
     <group ref={root}>
