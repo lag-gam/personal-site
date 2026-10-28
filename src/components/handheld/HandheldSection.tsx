@@ -99,7 +99,7 @@ export function HandheldSection({ creative }: { creative: GalleryPhoto[] }) {
   const progress = reduced ? still : scrollYProgress;
 
   // function form opts out of motion's accelerated scroll path, which lagged
-  const introOpacity = useTransform(scrollYProgress, (v) => 1 - Math.min(1, v / 0.1));
+  const introOpacity = useTransform(scrollYProgress, (v) => 1 - Math.min(1, v / 0.08));
   const introY = useTransform(scrollYProgress, [0, 0.1], [0, 12]);
 
   const open = useCallback((href: string) => {
@@ -110,7 +110,7 @@ export function HandheldSection({ creative }: { creative: GalleryPhoto[] }) {
   if (gl === false) return <PlainSite apps={apps} visible />;
 
   return (
-    <section ref={ref} aria-label="Agam Iheanyi-Igwe" className={reduced ? "relative h-screen" : "relative h-[260vh]"}>
+    <section ref={ref} aria-label="Agam Iheanyi-Igwe" className={reduced ? "relative h-screen" : "relative h-[340vh]"}>
       <div className="sticky top-0 h-screen w-full overflow-hidden bg-[radial-gradient(ellipse_at_50%_38%,#24262a_0%,#111214_55%,#000000_100%)]">
         <motion.div
           style={reduced ? { opacity: 0 } : { opacity: introOpacity, y: introY }}

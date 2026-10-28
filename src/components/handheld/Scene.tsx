@@ -23,6 +23,7 @@ const D = 1.5; // depth of each half
 const BASE_T = 0.15;
 const LID_T = 0.11;
 const OPEN_DEG = 112;
+const FLAT_DEG = 180;
 
 const SHELL = "#b0121c"; // metallic candy red
 const INNER = "#121314"; // glossy black bezel
@@ -367,39 +368,47 @@ function Device({
   /* ---------- animation ---------- */
 
   const look = useMemo(() => new THREE.Vector3(), []);
-  const camClosed = useMemo(() => new THREE.Vector3(0, 5.6, 3.3), []);
-  const camOpen = useMemo(() => new THREE.Vector3(0, 2.35, 4.6), []);
+  // three camera stops: closed, open, and flat (looking straight down at both screens)
+  const camClosed = useMemo(() => new THREE.Vector3(0, 4.6, 2.75), []);
+  const camOpen = useMemo(() => new THREE.Vector3(0, 1.95, 3.7), []);
+  const camFlat = useMemo(() => new THREE.Vector3(0, 4.95, -0.1), []);
   const lookClosed = useMemo(() => new THREE.Vector3(0, 0.1, 0.15), []);
   const lookOpen = useMemo(() => new THREE.Vector3(0, 0.5, -0.3), []);
+  const lookFlat = useMemo(() => new THREE.Vector3(0, 0, -0.75), []);
+  const tmp2 = useMemo(() => new THREE.Vector3(), []);
   const tmp = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((_, dt) => {
     smooth.current = THREE.MathUtils.damp(smooth.current, progress.get(), 7, dt);
     const p = smooth.current;
-    const open = ease(range(p, 0.12, 0.7));
+    const open = ease(range(p, 0.1, 0.55));
+    const flat = ease(range(p, 0.72, 0.97));
     const turn = ease(range(p, 0, 0.3));
-    const power = ease(range(p, 0.42, 0.68));
-    live.current = p > 0.66;
+    const power = ease(range(p, 0.32, 0.52));
+    live.current = p > 0.5;
     if (!startedRef.current && power > 0.6) {
       startedRef.current = true;
       setStarted(true);
     }
 
-    if (lid.current) lid.current.rotation.x = -THREE.MathUtils.degToRad(OPEN_DEG) * open;
+    if (lid.current)
+      lid.current.rotation.x = -THREE.MathUtils.degToRad(OPEN_DEG * open + (FLAT_DEG - OPEN_DEG) * flat);
 
     if (root.current) {
-      const px = pointer.x * (0.04 + 0.06 * open);
-      const py = pointer.y * 0.03 * open;
+      const px = pointer.x * (0.04 + 0.06 * open) * (1 - 0.7 * flat);
+      const py = pointer.y * 0.03 * open * (1 - 0.7 * flat);
       root.current.rotation.y = THREE.MathUtils.damp(root.current.rotation.y, -0.55 * (1 - turn) + px, 5, dt);
       root.current.rotation.x = THREE.MathUtils.damp(root.current.rotation.x, -py, 5, dt);
       root.current.position.y = 0.04 * Math.sin(performance.now() / 1400) * (1 - open * 0.6);
     }
 
     const aspect = size.width / size.height;
-    const fit = Math.max(1, 1.55 / aspect);
-    tmp.lerpVectors(camClosed, camOpen, open).multiplyScalar(fit);
-    camera.position.copy(tmp);
-    look.lerpVectors(lookClosed, lookOpen, open);
+    // narrow screens pull the camera back along its line of sight
+    const fit = Math.max(1, 1.45 / aspect);
+    look.lerpVectors(lookClosed, lookOpen, open).lerp(lookFlat, flat);
+    tmp.lerpVectors(camClosed, camOpen, open).lerp(camFlat, flat);
+    tmp2.subVectors(tmp, look).multiplyScalar(fit);
+    camera.position.copy(look).add(tmp2);
     camera.lookAt(look);
 
     // press feedback: pad tips toward the arm pressed, buttons sink

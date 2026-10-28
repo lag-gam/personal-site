@@ -199,6 +199,42 @@ function glyph(ctx: CanvasRenderingContext2D, g: Glyph, cx: number, cy: number, 
   ctx.restore();
 }
 
+/** small sound icon for films; the only thing drawn over media */
+function speaker(ctx: CanvasRenderingContext2D, x: number, y: number, muted: boolean) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath();
+  ctx.arc(30, 30, 34, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(10, 22);
+  ctx.lineTo(20, 22);
+  ctx.lineTo(32, 10);
+  ctx.lineTo(32, 50);
+  ctx.lineTo(20, 38);
+  ctx.lineTo(10, 38);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  if (muted) {
+    ctx.moveTo(40, 22);
+    ctx.lineTo(54, 38);
+    ctx.moveTo(54, 22);
+    ctx.lineTo(40, 38);
+  } else {
+    ctx.arc(36, 30, 10, -0.9, 0.9);
+    ctx.moveTo(36 + 18 * Math.cos(-0.9), 30 + 18 * Math.sin(-0.9));
+    ctx.arc(36, 30, 18, -0.9, 0.9);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function playBadge(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.beginPath();
   ctx.arc(x + 22, y + 22, 24, 0, Math.PI * 2);
@@ -545,43 +581,14 @@ function home(ctx: CanvasRenderingContext2D, greeting: string, caret: boolean, f
   ctx.fillText("Use the d-pad, or tap a tile below.", tx, 690);
 }
 
-function preview(ctx: CanvasRenderingContext2D, app: App, index: number, total: number) {
-  ctx.fillStyle = GREEN;
-  ctx.font = `600 32px ${FONT}`;
-  ctx.fillText(`${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`, X, 190);
+/** home, with a tile selected: just the app's name, and how to open it */
+function preview(ctx: CanvasRenderingContext2D, app: App) {
   ctx.fillStyle = INK;
-  ctx.font = `700 100px ${FONT}`;
-  ctx.fillText(app.label, X, 276);
-  const tw = ctx.measureText(app.label).width;
-  ctx.fillStyle = MUTED;
-  ctx.font = `500 42px ${FONT}`;
-  ctx.fillText(fit(ctx, app.blurb, TOP_W - X * 2 - tw - 40), X + tw + 36, 286);
-
-  const rows = app.items.slice(0, 4);
-  if (app.kind === "link") {
-    ctx.fillStyle = INK;
-    ctx.font = `600 42px ${FONT}`;
-    ctx.fillText("Opens as a PDF in a new tab.", X, 420);
-  } else if (!rows.length) {
-    ctx.fillStyle = FAINT;
-    ctx.font = `500 38px ${FONT}`;
-    ctx.fillText(app.empty ?? "Nothing here yet.", X, 420);
-  }
-  rows.forEach((it, i) => {
-    const y = 390 + i * 86;
-    ctx.fillStyle = "rgba(0,0,0,0.06)";
-    ctx.fillRect(X, y - 43, TOP_W - X * 2, 2);
-    ctx.font = `500 32px ${FONT}`;
-    const meta = it.meta ?? "";
-    const mw = meta ? ctx.measureText(meta).width + 48 : 0;
-    ctx.fillStyle = FAINT;
-    ctx.textAlign = "right";
-    if (meta) ctx.fillText(meta, TOP_W - X, y);
-    ctx.textAlign = "left";
-    ctx.fillStyle = INK;
-    ctx.font = `600 40px ${FONT}`;
-    ctx.fillText(fit(ctx, it.subtitle ? `${it.title}, ${it.subtitle}` : it.title, TOP_W - X * 2 - mw), X, y);
-  });
+  ctx.font = `700 168px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.fillText(app.label, TOP_W / 2, 430);
+  ctx.textAlign = "left";
+  footer(ctx, ["A Open"]);
 }
 
 /** returns how many pages the detail text needs, so the d-pad knows how far left/right can go */
@@ -596,24 +603,14 @@ function detail(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img
     return 1;
   }
 
-  // gallery: the photo or film is the page
+  // gallery: the photo or film fills the whole screen, nothing on top of it
   if (lv.kind === "grid") {
     const v = it.video ? vid(it.video) : null;
     const media: Media | null = v && v.readyState >= 2 ? v : img(it.image);
-    const box = { x: X, y: 138, w: TOP_W - X * 2, h: 610 };
-    if (media) cover(ctx, media, box.x, box.y, box.w, box.h, 28, true);
-    else placeholder(ctx, box.x, box.y, box.w, box.h, 28);
-    ctx.fillStyle = INK;
-    ctx.font = `600 38px ${FONT}`;
-    ctx.fillText(it.title, X, 812);
-    ctx.font = `500 32px ${FONT}`;
-    ctx.fillStyle = FAINT;
-    ctx.textAlign = "right";
-    ctx.fillText(it.video ? `A  Sound ${muted ? "on" : "off"}` : it.meta ?? "", TOP_W - X, 812);
-    ctx.textAlign = "left";
-    if (it.video && it.meta) {
-      ctx.fillText(it.meta, X + ctx.measureText(it.title).width + 40, 812);
-    }
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, TOP_W, TOP_H);
+    if (media) cover(ctx, media, 0, 0, TOP_W, TOP_H, 0);
+    if (it.video) speaker(ctx, TOP_W - 92, TOP_H - 92, muted);
     return 1;
   }
 
@@ -704,11 +701,12 @@ export function drawTop(
   if (view.app < 0) {
     const app = view.tile >= 0 ? apps[view.tile] : null;
     status(ctx, "Agam Iheanyi-Igwe", now);
-    if (app) preview(ctx, app, view.tile, apps.length);
+    if (app) preview(ctx, app);
     else home(ctx, greeting, caret, face);
     return 1;
   }
   const app = apps[view.app];
+  if (app.kind === "grid") return detail(ctx, apps, view, img, vid, muted);
   status(ctx, view.depth ? `${app.label}  \u203A  ${apps[view.app].items[view.item]?.title ?? ""}` : app.label, now);
   return detail(ctx, apps, view, img, vid, muted);
 }
