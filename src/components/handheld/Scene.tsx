@@ -8,7 +8,7 @@ import * as THREE from "three";
 import type { MotionValue } from "motion/react";
 import { HOME_GRID, THUMB_GRID, type App } from "./apps";
 import { taglines } from "@/data/site";
-import { FONT_FAMILY, SCREEN_H, SCREEN_W, TOP_H, TOP_W, cameraFrame, drawBottom, drawTop, level, type CamStatus, type View } from "./screens";
+import { FONT_FAMILY, MONO_FAMILY, SCREEN_H, SCREEN_W, TOP_H, TOP_W, cameraFrame, drawBottom, drawTop, level, type CamStatus, type View } from "./screens";
 
 /*
   An original dual-screen clamshell, and the whole site lives on it.
@@ -287,7 +287,10 @@ function Device({
   const [fontsReady, setFontsReady] = useState(0);
   useEffect(() => {
     if (!document.fonts) return;
-    Promise.all(["400", "500", "700", "800"].map((w) => document.fonts.load(`${w} 40px "${FONT_FAMILY}"`)))
+    Promise.all([
+      ...["400", "500", "700", "800"].map((w) => document.fonts.load(`${w} 40px "${FONT_FAMILY}"`)),
+      ...["400", "700"].map((w) => document.fonts.load(`${w} 40px "${MONO_FAMILY}"`)),
+    ])
       .then(() => setFontsReady((n) => n + 1))
       .catch(() => {});
   }, []);

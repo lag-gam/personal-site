@@ -39,7 +39,13 @@ const MUTED = "#71717a";
 const FAINT = "#a1a1aa";
 /** M PLUS 1p: a free Japanese gothic in the spirit of Fontworks Rodin */
 export const FONT_FAMILY = "M PLUS 1p";
-const FONT = `"${FONT_FAMILY}", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+const SANS = `"${FONT_FAMILY}", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+/** Monocraft (OFL): a pixel font for the Music app */
+export const MONO_FAMILY = "Monocraft";
+const MONO = `"${MONO_FAMILY}", ui-monospace, SFMono-Regular, Menlo, monospace`;
+/** the face every draw call below uses; set per screen, so the Music app can switch to the pixel font */
+let FONT = SANS;
+const faceFor = (apps: App[], view: View) => (view.app >= 0 && apps[view.app]?.id === "music" ? MONO : SANS);
 
 /* ---------- helpers ---------- */
 
@@ -345,6 +351,7 @@ function header(ctx: CanvasRenderingContext2D, title: string, right: string) {
 }
 
 export function drawBottom(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img, shots: HTMLCanvasElement[] = []) {
+  FONT = faceFor(apps, view);
   if (view.app >= 0 && apps[view.app]?.kind === "camera") {
     background(ctx);
     header(ctx, "Camera", shots.length ? `${shots.length} taken` : "");
@@ -700,8 +707,51 @@ function detail(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img
     y += 74;
   } else y += 20;
 
-  // lay out body lines, then show the requested page of them
   const bottom = 740;
+
+  // a playlist: numbered track list, bold titles, full width under the cover
+  if (it.tracklist?.length) {
+    const tl = it.tracklist;
+    let ty = Math.max(y, it.image ? 160 + 230 + 46 : y);
+    const LH = 50;
+    const perPage = Math.max(1, Math.floor((bottom - ty) / LH) + 1);
+    const pages = Math.max(1, Math.ceil(tl.length / perPage));
+    const page = Math.min(view.page, pages - 1);
+    const colW = TOP_W - X * 2;
+    tl.slice(page * perPage, (page + 1) * perPage).forEach((t, k) => {
+      const n = page * perPage + k + 1;
+      ctx.fillStyle = FAINT;
+      ctx.font = `400 26px ${FONT}`;
+      ctx.fillText(String(n).padStart(2, "0"), X, ty);
+      const x0 = X + 64;
+      ctx.fillStyle = INK;
+      ctx.font = `700 32px ${FONT}`;
+      const title = fit(ctx, t.title, colW * 0.6);
+      ctx.fillText(title, x0, ty);
+      const tw = ctx.measureText(title).width;
+      if (t.artist) {
+        ctx.fillStyle = MUTED;
+        ctx.font = `400 28px ${FONT}`;
+        ctx.fillText(fit(ctx, t.artist, colW - 64 - tw - 32), x0 + tw + 28, ty + 1);
+      }
+      ty += LH;
+    });
+    const parts: string[] = [];
+    if (it.children?.length) parts.push(`A ${it.childrenLabel ?? "Open"}`);
+    else if (it.href) parts.push(`A ${it.hrefLabel ?? "Open"}`);
+    parts.push("B Back");
+    footer(ctx, parts);
+    if (pages > 1) {
+      ctx.font = `600 30px ${FONT}`;
+      ctx.fillStyle = FAINT;
+      ctx.textAlign = "right";
+      ctx.fillText(`\u25C0  ${page + 1} / ${pages}  \u25B6`, TOP_W - X, 820);
+      ctx.textAlign = "left";
+    }
+    return pages;
+  }
+
+  // lay out body lines, then show the requested page of them
   const LH = 48;
   ctx.font = `400 34px ${FONT}`;
   const indent = it.bullets ? 34 : 0;
@@ -758,6 +808,7 @@ export function drawTop(
   cam?: Cam,
   tagline: { text: string; caret: boolean } = { text: "", caret: false }
 ): number {
+  FONT = faceFor(apps, view);
   if (view.app >= 0 && apps[view.app]?.kind === "camera") {
     drawCamera(ctx, cam);
     return 1;

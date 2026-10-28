@@ -20,6 +20,8 @@ export type Item = {
   /** A opens this; external links go to a new tab */
   href?: string;
   hrefLabel?: string;
+  /** a playlist's songs on its detail page: bold titles, artists beside them */
+  tracklist?: { title: string; artist?: string }[];
   /** A steps into these (a playlist's tracks); B steps back out */
   children?: Item[];
   childrenLabel?: string;
@@ -106,8 +108,7 @@ export function buildApps(data: {
       title: p.name,
       subtitle: p.description || undefined,
       meta: p.total != null ? `${p.total} songs` : "Playlist",
-      body: p.tracks.slice(0, 6).map((t) => `${t.name}  ·  ${t.artists}`),
-      bullets: true,
+      tracklist: p.tracks.map((t) => ({ title: t.name, artist: t.artists })),
       image: proxied(p.image),
       href: p.url,
       hrefLabel: "Open in Spotify",

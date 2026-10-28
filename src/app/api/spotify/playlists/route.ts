@@ -12,6 +12,21 @@ export type PlaylistInfo = {
   tracks: { name: string; artists: string; album: string; image: string | null; url: string; duration_ms: number }[];
 };
 
+/** Spotify returns playlist descriptions HTML-escaped (&quot;, &#x27;, &amp;...) */
+function decode(s: string) {
+  return s
+    .replace(/<[^>]+>/g, "")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .trim();
+}
+
 /** where the data came from, so a missing key or a Spotify change is visible at /api/spotify/playlists */
 type Source = "api" | "oembed" | "none";
 
@@ -49,8 +64,8 @@ async function viaApi(id: string, token: string): Promise<PlaylistInfo> {
   const entries = (list?.items ?? []).map((e) => e.item ?? e.track ?? null).filter((t): t is NonNullable<RawTrack> => !!t);
   return {
     id,
-    name: j.name,
-    description: (j.description ?? "").replace(/<[^>]+>/g, ""),
+    name: decode(j.name),
+    description: decode(j.description ?? ""),
     url: j.external_urls.spotify,
     image: j.images?.[0]?.url ?? null,
     total: list?.total ?? null,
@@ -70,7 +85,7 @@ async function viaOembed(id: string): Promise<PlaylistInfo> {
   const url = `https://open.spotify.com/playlist/${id}`;
   const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, { next: { revalidate } });
   const j = res.ok ? ((await res.json()) as { title?: string; thumbnail_url?: string }) : {};
-  return { id, name: j.title ?? "Playlist", description: "", url, image: j.thumbnail_url ?? null, total: null, tracks: [] };
+  return { id, name: decode(j.title ?? "Playlist"), description: "", url, image: j.thumbnail_url ?? null, total: null, tracks: [] };
 }
 
 export async function GET() {
