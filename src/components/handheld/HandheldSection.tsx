@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, useMotionValue, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { useMotionValue, useReducedMotion, useScroll } from "motion/react";
 import { buildApps, type App, type GalleryPhoto, type NowPlaying, type Playlist } from "./apps";
 import { Controls } from "./Controls";
 
@@ -99,10 +99,6 @@ export function HandheldSection({ creative }: { creative: GalleryPhoto[] }) {
   const still = useMotionValue(1);
   const progress = reduced ? still : scrollYProgress;
 
-  // function form opts out of motion's accelerated scroll path, which lagged
-  const introOpacity = useTransform(scrollYProgress, (v) => 1 - Math.min(1, v / 0.08));
-  const introY = useTransform(scrollYProgress, [0, 0.1], [0, 12]);
-
   // new tab when the browser allows it; if a popup blocker eats it, go there in this tab
   const open = useCallback((href: string) => {
     if (href.startsWith("mailto:")) {
@@ -120,14 +116,6 @@ export function HandheldSection({ creative }: { creative: GalleryPhoto[] }) {
   return (
     <section ref={ref} aria-label="Agam Iheanyi-Igwe" className={reduced ? "relative h-screen" : "relative h-[340vh]"}>
       <div className="sticky top-0 h-screen w-full overflow-hidden bg-[radial-gradient(ellipse_at_50%_38%,#24262a_0%,#111214_55%,#000000_100%)]">
-        <motion.div
-          style={reduced ? { opacity: 0 } : { opacity: introOpacity, y: introY }}
-          className="pointer-events-none absolute inset-x-0 bottom-[6vh] z-10 flex flex-col items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500"
-        >
-          Scroll to open
-          <span className="h-8 w-px animate-pulse bg-zinc-600" />
-        </motion.div>
-
         <Controls />
         <div className="absolute inset-0">{gl && <Scene progress={progress} apps={apps} onOpen={open} reduced={!!reduced} />}</div>
       </div>
