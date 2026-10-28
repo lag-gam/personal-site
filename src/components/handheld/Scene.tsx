@@ -142,7 +142,7 @@ function Device({
     look.lerpVectors(lookClosed, lookOpen, open);
     camera.lookAt(look);
 
-    const c = 0.05 + 1.15 * power;
+    const c = 0.05 + 0.96 * power;
     topMat.current?.color.setScalar(c);
     botMat.current?.color.setScalar(c);
   });
@@ -184,7 +184,7 @@ function Device({
         {shell}
       </RoundedBox>
       {/* bottom screen bezel and glass */}
-      <RoundedBox args={[1.64, 0.012, 1.25]} radius={0.02} smoothness={3} position={[0, BASE_T + 0.004, 0.02]} receiveShadow>
+      <RoundedBox args={[1.64, 0.012, 1.25]} radius={0.005} smoothness={2} position={[0, BASE_T + 0.004, 0.02]} receiveShadow>
         {inner}
       </RoundedBox>
       <mesh
@@ -297,8 +297,8 @@ export default function Scene({
       <Device progress={progress} onNavigate={onNavigate} reduced={reduced} />
       <ContactShadows position={[0, -0.001, 0]} opacity={0.85} scale={7} blur={2.2} far={2.5} resolution={1024} color="#000000" />
       <EffectComposer multisampling={4}>
-        {/* only the overdriven screens cross the threshold, so only they glow */}
-        <Bloom mipmapBlur luminanceThreshold={1} luminanceSmoothing={0.15} intensity={0.85} radius={0.7} />
+        {/* the white screens are the brightest thing in frame, so they carry the glow */}
+        <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.08} intensity={0.32} radius={0.55} />
       </EffectComposer>
     </Canvas>
   );
