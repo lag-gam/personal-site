@@ -2,6 +2,9 @@ import { GRID, menu, type MenuGlyph } from "./menu";
 
 export const SCREEN_W = 1024;
 export const SCREEN_H = 768;
+/* the top screen fills the whole lid, so it is wider than 4:3 */
+export const TOP_W = 1600;
+export const TOP_H = 866;
 
 const FOREST = "#14532d";
 const GREEN = "#008751";
@@ -167,49 +170,93 @@ export function drawBottom(ctx: CanvasRenderingContext2D, hovered: number) {
   });
 }
 
+function fit(ctx: CanvasRenderingContext2D, text: string, max: number) {
+  if (ctx.measureText(text).width <= max) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + "\u2026").width > max) t = t.slice(0, -1);
+  return t + "\u2026";
+}
+
 export function drawTop(
   ctx: CanvasRenderingContext2D,
-  hovered: number,
+  selected: number,
   now: Date,
   greeting: string,
   caret: boolean
 ) {
-  const g = ctx.createLinearGradient(0, 0, 0, SCREEN_H);
+  const g = ctx.createLinearGradient(0, 0, 0, TOP_H);
   g.addColorStop(0, "#ffffff");
-  g.addColorStop(1, "#f1f5f2");
+  g.addColorStop(1, "#f1f4f2");
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+  ctx.fillRect(0, 0, TOP_W, TOP_H);
 
+  const X = 96;
   ctx.textBaseline = "middle";
+
+  // status bar
   ctx.fillStyle = "#a1a1aa";
   ctx.font = `500 34px ${FONT}`;
+  ctx.textAlign = "left";
+  ctx.fillText("AGAM IHEANYI-IGWE", X, 76);
   ctx.textAlign = "right";
   const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const date = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-  ctx.fillText(`${date}   ${time}`, SCREEN_W - 64, 82);
+  ctx.fillText(`${date}   ${time}`, TOP_W - X, 76);
   ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(0,0,0,0.07)";
+  ctx.fillRect(X, 122, TOP_W - X * 2, 2);
 
-  // typed greeting with a caret
-  ctx.fillStyle = INK;
-  ctx.font = `700 120px ${FONT}`;
-  ctx.fillText(greeting, 64, 320);
-  if (caret) {
-    const x = 64 + ctx.measureText(greeting).width + 10;
-    ctx.fillStyle = GREEN;
-    ctx.fillRect(x, 268, 10, 104);
+  const item = selected >= 0 ? menu[selected] : null;
+
+  if (!item) {
+    // home: the typed greeting
+    ctx.fillStyle = INK;
+    ctx.font = `700 168px ${FONT}`;
+    ctx.fillText(greeting, X, 390);
+    if (caret) {
+      const x = X + ctx.measureText(greeting).width + 14;
+      ctx.fillStyle = GREEN;
+      ctx.fillRect(x, 318, 13, 146);
+    }
+    ctx.fillStyle = "#71717a";
+    ctx.font = `500 52px ${FONT}`;
+    ctx.fillText("Stanford CS. Infrastructure and security.", X, 530);
+    ctx.fillStyle = "#a1a1aa";
+    ctx.font = `500 38px ${FONT}`;
+    ctx.fillText("Pick a section on the bottom screen.", X, 760);
+    return;
   }
+
+  // section preview: title and blurb left, rows right
+  const split = 640;
+  ctx.fillStyle = GREEN;
+  ctx.font = `600 32px ${FONT}`;
+  ctx.fillText(`${String(selected + 1).padStart(2, "0")} / ${String(menu.length).padStart(2, "0")}`, X, 210);
+  ctx.fillStyle = INK;
+  ctx.font = `700 112px ${FONT}`;
+  ctx.fillText(item.label, X, 320);
   ctx.fillStyle = "#71717a";
   ctx.font = `500 44px ${FONT}`;
-  ctx.fillText("Agam Iheanyi-Igwe \u00b7 Stanford CS", 64, 420);
+  ctx.fillText(fit(ctx, item.blurb, split - X - 40), X, 420);
 
-  ctx.fillStyle = "rgba(0,0,0,0.08)";
-  ctx.fillRect(64, 520, SCREEN_W - 128, 2);
+  const rx = split + 40;
+  const rw = TOP_W - X - rx;
+  item.rows.forEach(([primary, secondary], i) => {
+    const y = 214 + i * 118;
+    ctx.fillStyle = "rgba(0,0,0,0.06)";
+    ctx.fillRect(rx, y + 56, rw, 2);
+    ctx.font = `500 34px ${FONT}`;
+    const sw = secondary ? ctx.measureText(secondary).width + 32 : 0;
+    ctx.fillStyle = "#a1a1aa";
+    ctx.textAlign = "right";
+    if (secondary) ctx.fillText(secondary, TOP_W - X, y);
+    ctx.textAlign = "left";
+    ctx.fillStyle = INK;
+    ctx.font = `600 42px ${FONT}`;
+    ctx.fillText(fit(ctx, primary, rw - sw), rx, y);
+  });
 
-  const item = hovered >= 0 ? menu[hovered] : null;
-  ctx.fillStyle = item ? FOREST : INK;
-  ctx.font = `600 48px ${FONT}`;
-  ctx.fillText(item ? item.label : "Pick a section below.", 64, 600);
-  ctx.fillStyle = "#71717a";
-  ctx.font = `400 38px ${FONT}`;
-  ctx.fillText(item ? item.blurb : "Tap a tile on the bottom screen.", 64, 670);
+  ctx.fillStyle = FOREST;
+  ctx.font = `600 38px ${FONT}`;
+  ctx.fillText("Tap again, or press A, to open", X, 760);
 }

@@ -64,9 +64,6 @@ export function HandheldSection() {
   // function form opts out of motion's accelerated scroll path, which lagged
   const introOpacity = useTransform(scrollYProgress, (v) => 1 - Math.min(1, v / 0.1));
   const introY = useTransform(scrollYProgress, [0, 0.1], [0, 12]);
-  const outroOpacity = useTransform(scrollYProgress, (v) => Math.min(1, Math.max(0, (v - 0.68) / 0.12)));
-  const outroY = useTransform(scrollYProgress, [0.68, 0.8], [24, 0]);
-  const outroPointer = useTransform(scrollYProgress, (v) => (v > 0.7 ? "auto" : "none"));
 
   const navigate = (href: string) => {
     if (href.startsWith("/#")) {
@@ -105,13 +102,8 @@ export function HandheldSection() {
 
         <div className="absolute inset-0">{gl && <Scene progress={progress} onNavigate={navigate} reduced={!!reduced} />}</div>
 
-        <motion.div
-          style={reduced ? undefined : { opacity: outroOpacity, y: outroY, pointerEvents: outroPointer }}
-          className="absolute inset-x-0 bottom-[7vh] z-10 px-5"
-        >
-          <p className="mb-3 text-center text-[13px] text-zinc-500">Tap a tile, or jump straight there.</p>
-          <MenuLinks onNavigate={navigate} dark />
-        </motion.div>
+        {/* screen readers and keyboard users still get plain links */}
+        <MenuLinks onNavigate={navigate} dark className="sr-only" />
       </div>
     </section>
   );

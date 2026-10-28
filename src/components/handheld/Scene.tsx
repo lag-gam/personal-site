@@ -7,7 +7,8 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { MotionValue } from "motion/react";
 import { menu } from "./menu";
-import { SCREEN_H, SCREEN_W, drawBottom, drawTop, hitTile } from "./screens";
+import { GRID } from "./menu";
+import { SCREEN_H, SCREEN_W, TOP_H, TOP_W, drawBottom, drawTop, hitTile } from "./screens";
 
 /*
   An original dual-screen clamshell. Scroll progress drives one timeline:
@@ -31,13 +32,13 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const range = (p: number, a: number, b: number) => clamp01((p - a) / (b - a));
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-function useScreenTexture(draw: (ctx: CanvasRenderingContext2D) => void, deps: unknown[]) {
+function useScreenTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void, deps: unknown[]) {
   const canvas = useMemo(() => {
     const c = document.createElement("canvas");
-    c.width = SCREEN_W;
-    c.height = SCREEN_H;
+    c.width = w;
+    c.height = h;
     return c;
-  }, []);
+  }, [w, h]);
   const texture = useMemo(() => {
     const t = new THREE.CanvasTexture(canvas);
     t.colorSpace = THREE.SRGBColorSpace;
@@ -70,7 +71,10 @@ function Device({
   const topMat = useRef<THREE.MeshBasicMaterial>(null);
   const botMat = useRef<THREE.MeshBasicMaterial>(null);
   const smooth = useRef(progress.get());
-  const [hovered, setHovered] = useState(-1);
+  // selected tile: drives both screens; -1 is the home greeting
+  const [sel, setSel] = useState(-1);
+  const selRef = useRef(-1);
+  selRef.current = sel;
   const [now, setNow] = useState(() => new Date());
   const live = useRef(false);
   // greeting types out on the top screen once it powers on
@@ -99,10 +103,52 @@ function Device({
   }, [typed]);
 
   const topTex = useScreenTexture(
-    (ctx) => drawTop(ctx, hovered, now, GREETING.slice(0, typed), typed < GREETING.length || blink),
-    [hovered, now, typed, blink]
+    TOP_W,
+    TOP_H,
+    (ctx) => drawTop(ctx, sel, now, GREETING.slice(0, typed), typed < GREETING.length || blink),
+    [sel, now, typed, blink]
   );
-  const botTex = useScreenTexture((ctx) => drawBottom(ctx, hovered), [hovered]);
+  const botTex = useScreenTexture(SCREEN_W, SCREEN_H, (ctx) => drawBottom(ctx, sel), [sel]);
+
+  // d-pad / arrow-key movement around the 3x2 grid
+  const move = (dx: number, dy: number) =>
+    setSel((s) => {
+      if (s < 0) return 0;
+      const c = (s % GRID.cols + dx + GRID.cols) % GRID.cols;
+      const r = (Math.floor(s / GRID.cols) + dy + GRID.rows) % GRID.rows;
+      return r * GRID.cols + c;
+    });
+  const open = () => {
+    if (live.current && selRef.current >= 0) onNavigate(menu[selRef.current].href);
+  };
+
+  // the canvas takes focus on click, then arrows move, Enter or A opens, Escape or B goes home
+  useEffect(() => {
+    const el = gl.domElement;
+    el.tabIndex = 0;
+    el.style.outline = "none";
+    el.setAttribute("aria-label", "Handheld menu. Use arrow keys to choose a section and Enter to open it.");
+    const onKey = (e: KeyboardEvent) => {
+      if (!live.current) return;
+      const k = e.key;
+      if (k === "ArrowLeft") move(-1, 0);
+      else if (k === "ArrowRight") move(1, 0);
+      else if (k === "ArrowUp") move(0, -1);
+      else if (k === "ArrowDown") move(0, 1);
+      else if (k === "Enter" || k === "a" || k === "A") open();
+      else if (k === "Escape" || k === "b" || k === "B") setSel(-1);
+      else return;
+      e.preventDefault();
+    };
+    const focus = () => el.focus({ preventScroll: true });
+    el.addEventListener("keydown", onKey);
+    el.addEventListener("pointerdown", focus);
+    return () => {
+      el.removeEventListener("keydown", onKey);
+      el.removeEventListener("pointerdown", focus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gl]);
 
   const look = useMemo(() => new THREE.Vector3(), []);
   const camClosed = useMemo(() => new THREE.Vector3(0, 5.6, 3.3), []);
@@ -147,20 +193,34 @@ function Device({
     botMat.current?.color.setScalar(c);
   });
 
+  const cursor = (on: boolean) => (gl.domElement.style.cursor = on ? "pointer" : "default");
+
+  // mouse hover previews a section; touch has no hover, so the first tap previews
   const pick = (e: ThreeEvent<PointerEvent>) => {
-    if (!live.current || !e.uv) return setHovered(-1);
+    if (!live.current || !e.uv || e.pointerType !== "mouse") return;
     const i = hitTile(e.uv.x, e.uv.y);
-    setHovered(i);
-    gl.domElement.style.cursor = i >= 0 ? "pointer" : "default";
+    if (i >= 0) setSel(i);
+    cursor(i >= 0);
   };
-  const leave = () => {
-    setHovered(-1);
-    gl.domElement.style.cursor = "default";
-  };
-  const click = (e: ThreeEvent<MouseEvent>) => {
+  const tap = (e: ThreeEvent<MouseEvent>) => {
     if (!live.current || !e.uv) return;
+    e.stopPropagation();
     const i = hitTile(e.uv.x, e.uv.y);
-    if (i >= 0) onNavigate(menu[i].href);
+    if (i < 0) return;
+    const mouse = (e.nativeEvent as PointerEvent).pointerType === "mouse";
+    if (mouse || selRef.current === i) onNavigate(menu[i].href);
+    else setSel(i);
+  };
+  const pad = (e: ThreeEvent<MouseEvent>) => {
+    if (!live.current) return;
+    e.stopPropagation();
+    const p = e.object.worldToLocal(e.point.clone());
+    if (Math.abs(p.x) > Math.abs(p.z)) move(p.x > 0 ? 1 : -1, 0);
+    else move(0, p.z > 0 ? 1 : -1);
+  };
+  const hoverable = {
+    onPointerOver: () => live.current && cursor(true),
+    onPointerOut: () => cursor(false),
   };
 
   // metallic red under a glossy clearcoat, like car paint: metal flake base, mirror coat on top
@@ -191,15 +251,15 @@ function Device({
         position={[0, BASE_T + 0.0115, 0.02]}
         rotation={[-Math.PI / 2, 0, 0]}
         onPointerMove={pick}
-        onPointerOut={leave}
-        onClick={click}
+        onPointerOut={() => cursor(false)}
+        onClick={tap}
       >
         <planeGeometry args={[1.52, 1.14]} />
         <meshBasicMaterial ref={botMat} map={botTex} toneMapped={false} />
       </mesh>
 
       {/* controls: an original layout, round pad left, two keys right */}
-      <mesh position={[-1.07, BASE_T + 0.01, 0.05]} castShadow>
+      <mesh position={[-1.07, BASE_T + 0.01, 0.05]} castShadow onClick={pad} {...hoverable}>
         <cylinderGeometry args={[0.165, 0.165, 0.025, 48]} />
         {inner}
       </mesh>
@@ -210,8 +270,18 @@ function Device({
       {[
         [0.99, -0.06],
         [1.14, 0.14],
-      ].map(([x, z]) => (
-        <mesh key={`${x}`} position={[x, BASE_T + 0.016, z]} castShadow>
+      ].map(([x, z], k) => (
+        <mesh
+          key={`${x}`}
+          position={[x, BASE_T + 0.016, z]}
+          castShadow
+          onClick={(e) => {
+            e.stopPropagation();
+            if (k === 1) open(); // A: open
+            else setSel(-1); // B: home
+          }}
+          {...hoverable}
+        >
           <cylinderGeometry args={[0.07, 0.07, 0.035, 40]} />
           <meshPhysicalMaterial color={DARK} roughness={0.25} metalness={0.3} clearcoat={1} clearcoatRoughness={0.05} />
         </mesh>
@@ -232,22 +302,14 @@ function Device({
         <RoundedBox args={[W, LID_T, D]} radius={0.05} smoothness={5} position={[0, LID_T / 2, D / 2]} castShadow receiveShadow>
           {shell}
         </RoundedBox>
-        {/* inner face: bezel, top screen, speaker slots */}
+        {/* inner face: bezel and an edge-to-edge top screen */}
         <RoundedBox args={[W - 0.12, 0.01, D - 0.12]} radius={0.004} smoothness={2} position={[0, -0.003, D / 2]}>
           {inner}
         </RoundedBox>
-        <mesh position={[0, -0.0095, D / 2 + 0.01]} rotation={[Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[1.76, 1.32]} />
+        <mesh position={[0, -0.0095, D / 2]} rotation={[Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[2.4, 1.3]} />
           <meshBasicMaterial ref={topMat} map={topTex} toneMapped={false} />
         </mesh>
-        {[-1, 1].map((s) =>
-          [0, 1, 2].map((k) => (
-            <mesh key={`${s}-${k}`} position={[s * 1.07, -0.0095, D / 2 - 0.1 + k * 0.1]} rotation={[Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[0.13, 0.02]} />
-              <meshBasicMaterial color="#3a0508" />
-            </mesh>
-          ))
-        )}
       </group>
     </group>
   );
