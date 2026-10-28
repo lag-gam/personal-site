@@ -371,7 +371,7 @@ function Device({
   // three camera stops: closed, open, and flat (looking straight down at both screens)
   const camClosed = useMemo(() => new THREE.Vector3(0, 4.6, 2.75), []);
   const camOpen = useMemo(() => new THREE.Vector3(0, 1.95, 3.7), []);
-  const camFlat = useMemo(() => new THREE.Vector3(0, 4.95, -0.1), []);
+  const camFlat = useMemo(() => new THREE.Vector3(0, 5.55, -0.2), []);
   const lookClosed = useMemo(() => new THREE.Vector3(0, 0.1, 0.15), []);
   const lookOpen = useMemo(() => new THREE.Vector3(0, 0.5, -0.3), []);
   const lookFlat = useMemo(() => new THREE.Vector3(0, 0, -0.75), []);
