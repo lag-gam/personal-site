@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { ContactShadows, Environment, Lightformer, RoundedBox } from "@react-three/drei";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { MotionValue } from "motion/react";
-import { menu } from "./menu";
-import { GRID } from "./menu";
-import { SCREEN_H, SCREEN_W, TOP_H, TOP_W, drawBottom, drawTop, hitTile } from "./screens";
+import { HOME_GRID, THUMB_GRID, type App } from "./apps";
+import { SCREEN_H, SCREEN_W, TOP_H, TOP_W, drawBottom, drawTop, hitBottom, type View } from "./screens";
 
 /*
-  An original dual-screen clamshell. Scroll progress drives one timeline:
+  An original dual-screen clamshell, and the whole site lives on it.
+  Scroll progress drives the opening:
     0.00 – 0.12  closed, lid up, slow turn toward the viewer
     0.12 – 0.70  lid swings open, screens power on, camera drops to the front
-    0.70 – 1.00  open and still; the bottom screen is a live menu
+    0.70 – 1.00  open and still; the device is live
+  Then: d-pad or arrows move, A or Enter opens, B or Esc goes back, taps work everywhere.
 */
 
 const W = 2.6; // width
@@ -26,11 +27,11 @@ const OPEN_DEG = 112;
 const SHELL = "#b0121c"; // metallic candy red
 const INNER = "#121314"; // glossy black bezel
 const DARK = "#1d1e20";
-const ACCENT = "#ffd9d6";
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const range = (p: number, a: number, b: number) => clamp01((p - a) / (b - a));
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 
 function useScreenTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void, deps: unknown[]) {
   const canvas = useMemo(() => {
@@ -55,15 +56,72 @@ function useScreenTexture(w: number, h: number, draw: (ctx: CanvasRenderingConte
   return texture;
 }
 
-const GREETING = "Hi, I\u2019m Agam";
+/** lazy image cache; bumps a version whenever something finishes loading so screens redraw */
+function useImages() {
+  const cache = useRef(new Map<string, HTMLImageElement | "loading" | "failed">());
+  const [version, setVersion] = useState(0);
+  const img = useCallback((src: string | null | undefined) => {
+    if (!src) return null;
+    const hit = cache.current.get(src);
+    if (hit instanceof HTMLImageElement) return hit;
+    if (!hit) {
+      cache.current.set(src, "loading");
+      const im = new Image();
+      im.decoding = "async";
+      im.onload = () => {
+        cache.current.set(src, im);
+        setVersion((v) => v + 1);
+      };
+      im.onerror = () => cache.current.set(src, "failed");
+      im.src = src;
+    }
+    return null;
+  }, []);
+  return { img, version };
+}
+
+const GREETING = "Hi, I’m Agam";
+
+function useCross() {
+  return useMemo(() => {
+    const a = 0.052; // arm half-width
+    const L = 0.16; // arm half-length
+    const s = new THREE.Shape();
+    s.moveTo(-a, -L);
+    s.lineTo(a, -L);
+    s.lineTo(a, -a);
+    s.lineTo(L, -a);
+    s.lineTo(L, a);
+    s.lineTo(a, a);
+    s.lineTo(a, L);
+    s.lineTo(-a, L);
+    s.lineTo(-a, a);
+    s.lineTo(-L, a);
+    s.lineTo(-L, -a);
+    s.lineTo(-a, -a);
+    s.closePath();
+    const g = new THREE.ExtrudeGeometry(s, {
+      depth: 0.026,
+      bevelEnabled: true,
+      bevelThickness: 0.006,
+      bevelSize: 0.008,
+      bevelSegments: 4,
+      curveSegments: 4,
+    });
+    g.rotateX(-Math.PI / 2); // extrude upward
+    return g;
+  }, []);
+}
 
 function Device({
   progress,
-  onNavigate,
+  apps,
+  onOpen,
   reduced,
 }: {
   progress: MotionValue<number>;
-  onNavigate: (href: string) => void;
+  apps: App[];
+  onOpen: (href: string) => void;
   reduced: boolean;
 }) {
   const root = useRef<THREE.Group>(null);
@@ -71,30 +129,32 @@ function Device({
   const topMat = useRef<THREE.MeshBasicMaterial>(null);
   const botMat = useRef<THREE.MeshBasicMaterial>(null);
   const smooth = useRef(progress.get());
-  // selected tile: drives both screens; -1 is the home greeting
-  const [sel, setSel] = useState(-1);
-  const selRef = useRef(-1);
-  selRef.current = sel;
-  const [now, setNow] = useState(() => new Date());
   const live = useRef(false);
-  // greeting types out on the top screen once it powers on
-  const [typed, setTyped] = useState(reduced ? GREETING.length : 0);
-  const [started, setStarted] = useState(reduced);
-  const startedRef = useRef(reduced);
   const { camera, pointer, size, gl } = useThree();
+  const { img, version } = useImages();
+  const cross = useCross();
 
+  const [view, setView] = useState<View>({ app: -1, tile: -1, item: 0 });
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const appsRef = useRef(apps);
+  appsRef.current = apps;
+
+  const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
 
+  // greeting types out on the top screen once it powers on
+  const [typed, setTyped] = useState(reduced ? GREETING.length : 0);
+  const [started, setStarted] = useState(reduced);
+  const startedRef = useRef(reduced);
   useEffect(() => {
     if (!started || typed >= GREETING.length) return;
     const id = setTimeout(() => setTyped((t) => t + 1), typed === 0 ? 350 : 95);
     return () => clearTimeout(id);
   }, [typed, started]);
-
-  // caret blink after typing finishes
   const [blink, setBlink] = useState(true);
   useEffect(() => {
     if (typed < GREETING.length) return;
@@ -102,67 +162,142 @@ function Device({
     return () => clearInterval(id);
   }, [typed]);
 
-  const [face, setFace] = useState<HTMLImageElement | null>(null);
-  useEffect(() => {
-    const img = new Image();
-    img.onload = () => setFace(img);
-    img.src = "/headshot.jpg";
-  }, []);
+  const face = img("/headshot.jpg");
 
   const topTex = useScreenTexture(
     TOP_W,
     TOP_H,
-    (ctx) => drawTop(ctx, sel, now, GREETING.slice(0, typed), typed < GREETING.length || blink, face),
-    [sel, now, typed, blink, face]
+    (ctx) => drawTop(ctx, apps, view, now, GREETING.slice(0, typed), typed < GREETING.length || blink, face, img),
+    [apps, view, now, typed, blink, version]
   );
-  const botTex = useScreenTexture(SCREEN_W, SCREEN_H, (ctx) => drawBottom(ctx, sel), [sel]);
+  const botTex = useScreenTexture(SCREEN_W, SCREEN_H, (ctx) => drawBottom(ctx, apps, view, img), [apps, view, version]);
 
-  // d-pad / arrow-key movement around the 3x2 grid
+  /* ---------- navigation ---------- */
+
+  const padRef = useRef<THREE.Group>(null);
+  const padPress = useRef({ dx: 0, dz: 0, t: -1e9 });
+  const btnRefs = useRef<(THREE.Group | null)[]>([]);
+  const btnPress = useRef<number[]>([-1e9, -1e9]);
+  const press = (k: number) => (btnPress.current[k] = performance.now());
+
+  const enter = (i: number) => {
+    const app = appsRef.current[i];
+    if (!app) return;
+    if (app.kind === "link") {
+      if (app.href) onOpen(app.href);
+      setView((v) => ({ ...v, tile: i }));
+    } else setView({ app: i, tile: i, item: 0 });
+  };
+
   const move = (dx: number, dy: number) => {
     padPress.current = { dx, dz: dy, t: performance.now() };
-    setSel((s) => {
-      if (s < 0) return 0;
-      const c = (s % GRID.cols + dx + GRID.cols) % GRID.cols;
-      const r = (Math.floor(s / GRID.cols) + dy + GRID.rows) % GRID.rows;
-      return r * GRID.cols + c;
+    setView((v) => {
+      if (v.app < 0) {
+        if (v.tile < 0) return { ...v, tile: 0 };
+        const c = (v.tile % HOME_GRID.cols + dx + HOME_GRID.cols) % HOME_GRID.cols;
+        const r = (Math.floor(v.tile / HOME_GRID.cols) + dy + HOME_GRID.rows) % HOME_GRID.rows;
+        return { ...v, tile: Math.min(r * HOME_GRID.cols + c, appsRef.current.length - 1) };
+      }
+      const app = appsRef.current[v.app];
+      const n = app.items.length;
+      if (!n) return v;
+      const step = app.kind === "grid" ? dx + dy * THUMB_GRID.cols : dy || dx;
+      return { ...v, item: clamp(v.item + step, 0, n - 1) };
     });
   };
-  const open = () => {
-    if (live.current && selRef.current >= 0) onNavigate(menu[selRef.current].href);
-  };
-  const keyPress = (k: string) => {
-    if (k === "Enter" || k === "a" || k === "A") press(1);
-    if (k === "Escape" || k === "b" || k === "B") press(0);
+
+  const activate = () => {
+    if (!live.current) return;
+    const v = viewRef.current;
+    if (v.app < 0) {
+      if (v.tile >= 0) enter(v.tile);
+      else setView({ ...v, tile: 0 });
+      return;
+    }
+    const it = appsRef.current[v.app]?.items[v.item];
+    if (it?.href) onOpen(it.href);
   };
 
-  // the canvas takes focus on click, then arrows move, Enter or A opens, Escape or B goes home
+  const back = () =>
+    setView((v) => (v.app >= 0 ? { app: -1, tile: v.app, item: 0 } : { ...v, tile: -1 }));
+
+  // keys work anywhere once the device is open
   useEffect(() => {
-    const el = gl.domElement;
-    el.tabIndex = 0;
-    el.style.outline = "none";
-    el.setAttribute("aria-label", "Handheld menu. Use arrow keys to choose a section and Enter to open it.");
     const onKey = (e: KeyboardEvent) => {
-      if (!live.current) return;
+      if (!live.current || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key;
-      keyPress(k);
       if (k === "ArrowLeft") move(-1, 0);
       else if (k === "ArrowRight") move(1, 0);
       else if (k === "ArrowUp") move(0, -1);
       else if (k === "ArrowDown") move(0, 1);
-      else if (k === "Enter" || k === "a" || k === "A") open();
-      else if (k === "Escape" || k === "b" || k === "B") setSel(-1);
-      else return;
+      else if (k === "Enter" || k === "a" || k === "A") {
+        press(1);
+        activate();
+      } else if (k === "Escape" || k === "Backspace" || k === "b" || k === "B") {
+        press(0);
+        back();
+      } else return;
       e.preventDefault();
     };
-    const focus = () => el.focus({ preventScroll: true });
-    el.addEventListener("keydown", onKey);
-    el.addEventListener("pointerdown", focus);
-    return () => {
-      el.removeEventListener("keydown", onKey);
-      el.removeEventListener("pointerdown", focus);
-    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gl]);
+  }, []);
+
+  const cursor = (on: boolean) => (gl.domElement.style.cursor = on ? "pointer" : "default");
+
+  // mouse hover highlights; a tap on the highlighted thing opens it, so touch is tap to pick, tap to open
+  const hover = (e: ThreeEvent<PointerEvent>) => {
+    if (!live.current || !e.uv || e.pointerType !== "mouse") return;
+    const h = hitBottom(appsRef.current, viewRef.current, e.uv.x, e.uv.y);
+    cursor(!!h);
+    if (h?.kind === "tile") setView((v) => (v.tile === h.i ? v : { ...v, tile: h.i }));
+    if (h?.kind === "row") setView((v) => (v.item === h.i ? v : { ...v, item: h.i }));
+  };
+  const tap = (e: ThreeEvent<MouseEvent>) => {
+    if (!live.current || !e.uv) return;
+    e.stopPropagation();
+    const v = viewRef.current;
+    const h = hitBottom(appsRef.current, v, e.uv.x, e.uv.y);
+    if (!h) return;
+    if (h.kind === "back") return back();
+    if (h.kind === "tile") return v.tile === h.i ? enter(h.i) : setView({ ...v, tile: h.i });
+    if (h.kind === "row") {
+      if (v.item === h.i) activate();
+      else setView({ ...v, item: h.i });
+    }
+  };
+  const pad = (e: ThreeEvent<MouseEvent>) => {
+    if (!live.current || !padRef.current) return;
+    e.stopPropagation();
+    const p = padRef.current.worldToLocal(e.point.clone());
+    if (Math.abs(p.x) > Math.abs(p.z)) move(p.x > 0 ? 1 : -1, 0);
+    else move(0, p.z > 0 ? 1 : -1);
+  };
+  const hoverable = {
+    onPointerOver: () => live.current && cursor(true),
+    onPointerOut: () => cursor(false),
+  };
+
+  const labels = useMemo(
+    () =>
+      ["B", "A"].map((ch) => {
+        const c = document.createElement("canvas");
+        c.width = c.height = 128;
+        const x = c.getContext("2d")!;
+        x.fillStyle = "rgba(255,255,255,0.85)";
+        x.font = `700 72px ui-sans-serif, -apple-system, "Inter", sans-serif`;
+        x.textAlign = "center";
+        x.textBaseline = "middle";
+        x.fillText(ch, 64, 70);
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }),
+    []
+  );
+
+  /* ---------- animation ---------- */
 
   const look = useMemo(() => new THREE.Vector3(), []);
   const camClosed = useMemo(() => new THREE.Vector3(0, 5.6, 3.3), []);
@@ -186,15 +321,13 @@ function Device({
     if (lid.current) lid.current.rotation.x = -THREE.MathUtils.degToRad(OPEN_DEG) * open;
 
     if (root.current) {
-      // pointer parallax, stronger once open
-      const px = pointer.x * (0.04 + 0.08 * open);
-      const py = pointer.y * 0.04 * open;
+      const px = pointer.x * (0.04 + 0.06 * open);
+      const py = pointer.y * 0.03 * open;
       root.current.rotation.y = THREE.MathUtils.damp(root.current.rotation.y, -0.55 * (1 - turn) + px, 5, dt);
       root.current.rotation.x = THREE.MathUtils.damp(root.current.rotation.x, -py, 5, dt);
       root.current.position.y = 0.04 * Math.sin(performance.now() / 1400) * (1 - open * 0.6);
     }
 
-    // fit the open device to narrow screens by pulling the camera back
     const aspect = size.width / size.height;
     const fit = Math.max(1, 1.55 / aspect);
     tmp.lerpVectors(camClosed, camOpen, open).multiplyScalar(fit);
@@ -218,74 +351,15 @@ function Device({
     botMat.current?.color.setScalar(c);
   });
 
-  const padRef = useRef<THREE.Group>(null);
-  const padPress = useRef({ dx: 0, dz: 0, t: -1e9 });
-  const btnRefs = useRef<(THREE.Group | null)[]>([]);
-  const btnPress = useRef<number[]>([-1e9, -1e9]);
-  const press = (k: number) => (btnPress.current[k] = performance.now());
-
-  const labels = useMemo(
-    () =>
-      ["B", "A"].map((ch) => {
-        const c = document.createElement("canvas");
-        c.width = c.height = 128;
-        const x = c.getContext("2d")!;
-        x.fillStyle = "rgba(255,255,255,0.85)";
-        x.font = `700 72px ui-sans-serif, -apple-system, "Inter", sans-serif`;
-        x.textAlign = "center";
-        x.textBaseline = "middle";
-        x.fillText(ch, 64, 70);
-        const t = new THREE.CanvasTexture(c);
-        t.colorSpace = THREE.SRGBColorSpace;
-        return t;
-      }),
-    []
-  );
-
-  const cursor = (on: boolean) => (gl.domElement.style.cursor = on ? "pointer" : "default");
-
-  // mouse hover previews a section; touch has no hover, so the first tap previews
-  const pick = (e: ThreeEvent<PointerEvent>) => {
-    if (!live.current || !e.uv || e.pointerType !== "mouse") return;
-    const i = hitTile(e.uv.x, e.uv.y);
-    if (i >= 0) setSel(i);
-    cursor(i >= 0);
-  };
-  const tap = (e: ThreeEvent<MouseEvent>) => {
-    if (!live.current || !e.uv) return;
-    e.stopPropagation();
-    const i = hitTile(e.uv.x, e.uv.y);
-    if (i < 0) return;
-    const mouse = (e.nativeEvent as PointerEvent).pointerType === "mouse";
-    if (mouse || selRef.current === i) onNavigate(menu[i].href);
-    else setSel(i);
-  };
-  const pad = (e: ThreeEvent<MouseEvent>) => {
-    if (!live.current) return;
-    e.stopPropagation();
-    if (!padRef.current) return;
-    const p = padRef.current.worldToLocal(e.point.clone());
-    if (Math.abs(p.x) > Math.abs(p.z)) move(p.x > 0 ? 1 : -1, 0);
-    else move(0, p.z > 0 ? 1 : -1);
-  };
-  const hoverable = {
-    onPointerOver: () => live.current && cursor(true),
-    onPointerOut: () => cursor(false),
-  };
+  /* ---------- materials ---------- */
 
   // metallic red under a glossy clearcoat, like car paint: metal flake base, mirror coat on top
   const shell = (
-    <meshPhysicalMaterial
-      color={SHELL}
-      metalness={0.8}
-      roughness={0.3}
-      clearcoat={1}
-      clearcoatRoughness={0.03}
-      envMapIntensity={1.4}
-    />
+    <meshPhysicalMaterial color={SHELL} metalness={0.8} roughness={0.3} clearcoat={1} clearcoatRoughness={0.03} envMapIntensity={1.4} />
   );
   const inner = <meshPhysicalMaterial color={INNER} roughness={0.3} metalness={0.05} clearcoat={0.8} clearcoatRoughness={0.08} />;
-  const dark = <meshPhysicalMaterial color={DARK} roughness={0.3} clearcoat={0.8} clearcoatRoughness={0.1} />;
+  const dark = <meshPhysicalMaterial color={DARK} roughness={0.28} metalness={0.3} clearcoat={1} clearcoatRoughness={0.05} />;
+  const chrome = <meshPhysicalMaterial color="#f4f4f4" metalness={1} roughness={0.07} clearcoat={1} clearcoatRoughness={0.02} envMapIntensity={1.6} />;
 
   return (
     <group ref={root}>
@@ -300,7 +374,7 @@ function Device({
       <mesh
         position={[0, BASE_T + 0.0115, 0.02]}
         rotation={[-Math.PI / 2, 0, 0]}
-        onPointerMove={pick}
+        onPointerMove={hover}
         onPointerOut={() => cursor(false)}
         onClick={tap}
       >
@@ -308,19 +382,18 @@ function Device({
         <meshBasicMaterial ref={botMat} map={botTex} toneMapped={false} />
       </mesh>
 
-      {/* controls: cross d-pad left, A and B right; all of them work */}
+      {/* d-pad: one extruded cross, so there are no overlapping faces to flicker */}
       <mesh position={[-1.07, BASE_T + 0.003, 0.05]} receiveShadow>
-        <cylinderGeometry args={[0.19, 0.19, 0.006, 48]} />
+        <cylinderGeometry args={[0.2, 0.2, 0.006, 48]} />
         {inner}
       </mesh>
-      <group ref={padRef} position={[-1.07, BASE_T + 0.006, 0.05]} onClick={pad} {...hoverable}>
-        <RoundedBox args={[0.32, 0.035, 0.105]} radius={0.012} smoothness={3} position={[0, 0.0175, 0]} castShadow>
+      <group ref={padRef} position={[-1.07, BASE_T + 0.012, 0.05]} onClick={pad} {...hoverable}>
+        <mesh geometry={cross} castShadow>
           {dark}
-        </RoundedBox>
-        <RoundedBox args={[0.105, 0.035, 0.32]} radius={0.012} smoothness={3} position={[0, 0.0175, 0]} castShadow>
-          {dark}
-        </RoundedBox>
+        </mesh>
       </group>
+
+      {/* A and B */}
       {[
         { x: 0.98, z: 0.1, label: "B" },
         { x: 1.15, z: -0.06, label: "A" },
@@ -334,14 +407,14 @@ function Device({
           onClick={(e) => {
             e.stopPropagation();
             press(k);
-            if (btn.label === "A") open();
-            else setSel(-1);
+            if (btn.label === "A") activate();
+            else back();
           }}
           {...hoverable}
         >
           <mesh position={[0, 0.0175, 0]} castShadow>
             <cylinderGeometry args={[0.072, 0.072, 0.035, 40]} />
-            <meshPhysicalMaterial color={DARK} roughness={0.25} metalness={0.3} clearcoat={1} clearcoatRoughness={0.05} />
+            {dark}
           </mesh>
           <mesh position={[0, 0.0356, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[0.1, 0.1]} />
@@ -365,6 +438,13 @@ function Device({
         <RoundedBox args={[W, LID_T, D]} radius={0.05} smoothness={5} position={[0, LID_T / 2, D / 2]} castShadow receiveShadow>
           {shell}
         </RoundedBox>
+        {/* outer face: a polished chrome inlay set into the red */}
+        <RoundedBox args={[0.74, 0.008, 0.15]} radius={0.003} smoothness={2} position={[0, LID_T + 0.002, D / 2 + 0.44]}>
+          {chrome}
+        </RoundedBox>
+        <RoundedBox args={[W - 0.16, 0.004, 0.012]} radius={0.0015} smoothness={2} position={[0, LID_T + 0.0005, D - 0.06]}>
+          {chrome}
+        </RoundedBox>
         {/* inner face: bezel and an edge-to-edge top screen */}
         <RoundedBox args={[W - 0.12, 0.01, D - 0.12]} radius={0.004} smoothness={2} position={[0, -0.003, D / 2]}>
           {inner}
@@ -380,11 +460,13 @@ function Device({
 
 export default function Scene({
   progress,
-  onNavigate,
+  apps,
+  onOpen,
   reduced = false,
 }: {
   progress: MotionValue<number>;
-  onNavigate: (href: string) => void;
+  apps: App[];
+  onOpen: (href: string) => void;
   reduced?: boolean;
 }) {
   return (
@@ -417,9 +499,9 @@ export default function Scene({
         <Lightformer form="rect" intensity={3} position={[2.5, 4, -3]} scale={[1.2, 6, 1]} rotation={[0.6, -0.6, 0]} />
         <Lightformer form="rect" intensity={3} position={[-2.5, 4, -3]} scale={[1.2, 6, 1]} rotation={[0.6, 0.6, 0]} />
         <Lightformer form="rect" intensity={0.6} color="#dfe8e2" position={[0, -3, 0]} scale={[10, 10, 1]} rotation-x={-Math.PI / 2} />
-        <Lightformer form="ring" intensity={1.4} color={ACCENT} position={[0, 1.5, -6]} scale={4} />
+        <Lightformer form="ring" intensity={1.4} color="#ffd9d6" position={[0, 1.5, -6]} scale={4} />
       </Environment>
-      <Device progress={progress} onNavigate={onNavigate} reduced={reduced} />
+      <Device progress={progress} apps={apps} onOpen={onOpen} reduced={reduced} />
       <ContactShadows position={[0, -0.001, 0]} opacity={0.85} scale={7} blur={2.2} far={2.5} resolution={1024} color="#000000" />
       <EffectComposer multisampling={4}>
         {/* the white screens are the brightest thing in frame, so they carry the glow */}

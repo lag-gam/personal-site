@@ -1,15 +1,10 @@
 import { HandheldSection } from "@/components/handheld/HandheldSection";
-import { Experience } from "@/components/Experience";
-import { OutOfOffice } from "@/components/OutOfOffice";
-import { Contact } from "@/components/Contact";
+import { readGallery } from "@/lib/gallery";
 
 export default function Home() {
   return (
-    <main className="w-full bg-white">
-      <HandheldSection />
-      <Experience />
-      <OutOfOffice />
-      <Contact />
+    <main className="w-full bg-black">
+      <HandheldSection creative={readGallery("creative")} technical={readGallery("technical")} />
     </main>
   );
 }

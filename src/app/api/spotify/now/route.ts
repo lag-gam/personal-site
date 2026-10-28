@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { accessToken } from "@/lib/spotify";
 
-const TOKEN_URL = "https://accounts.spotify.com/api/token";
 const NOW_URL = "https://api.spotify.com/v1/me/player/currently-playing";
 const RECENT_URL = "https://api.spotify.com/v1/me/player/recently-played?limit=1";
 
@@ -11,22 +11,6 @@ type Track = {
   album: { name: string; images: { url: string }[] };
   duration_ms: number;
 };
-
-async function accessToken(id: string, secret: string, refresh: string) {
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh }),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`token ${res.status}`);
-  const json = (await res.json()) as { access_token?: string };
-  if (!json.access_token) throw new Error("no access_token in response");
-  return json.access_token;
-}
 
 const shape = (t: Track, playing: boolean, progress_ms: number | null) => ({
   playing,

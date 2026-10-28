@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Nav } from "@/components/Nav";
-import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: "Agam Iheanyi-Igwe",
@@ -18,11 +16,9 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className="bg-white text-ink antialiased selection:bg-forest/15">
-        <Nav />
+    <html lang="en" className="bg-black">
+      <body className="bg-black text-white antialiased selection:bg-white/20">
         {children}
-        <Footer />
       </body>
     </html>
   );
