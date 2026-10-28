@@ -64,6 +64,7 @@ export function buildApps(data: {
   technical: GalleryPhoto[];
   playlists: Playlist[];
   now: NowPlaying;
+  musicLoaded: boolean;
 }): App[] {
   const photo = (p: GalleryPhoto): Item => ({
     title: p.caption,
@@ -138,7 +139,7 @@ export function buildApps(data: {
       glyph: "music",
       kind: "list",
       items: music,
-      empty: "Loading playlists…",
+      empty: data.musicLoaded ? "Couldn\u2019t reach Spotify right now." : "Loading playlists\u2026",
     },
     {
       id: "creative",

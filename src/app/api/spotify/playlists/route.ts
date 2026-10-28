@@ -63,14 +63,24 @@ export async function GET() {
       console.error("[spotify playlists] token", err);
     }
   }
+  const bare = (id: string, i: number): PlaylistInfo => ({
+    id,
+    name: `Playlist ${i + 1}`,
+    description: "",
+    url: `https://open.spotify.com/playlist/${id}`,
+    image: null,
+    total: null,
+    tracks: [],
+  });
   const out = await Promise.all(
-    playlists.map(async ({ id }) => {
+    playlists.map(async ({ id }, i) => {
       try {
         return token ? await viaApi(id, token) : await viaOembed(id);
       } catch {
-        return viaOembed(id).catch(() => null);
+        // Spotify unreachable: still list it, so it can be opened
+        return viaOembed(id).catch(() => bare(id, i));
       }
     })
   );
-  return NextResponse.json({ playlists: out.filter(Boolean) });
+  return NextResponse.json({ playlists: out });
 }

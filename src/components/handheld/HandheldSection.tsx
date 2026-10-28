@@ -71,12 +71,14 @@ export function HandheldSection({ creative, technical }: { creative: GalleryPhot
 
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [now, setNow] = useState<NowPlaying>(null);
+  const [musicLoaded, setMusicLoaded] = useState(false);
   useEffect(() => {
     let alive = true;
     fetch("/api/spotify/playlists")
       .then((r) => r.json())
       .then((d: { playlists?: Playlist[] }) => alive && setPlaylists(d.playlists ?? []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => alive && setMusicLoaded(true));
     const loadNow = () =>
       fetch("/api/spotify/now")
         .then((r) => r.json())
@@ -90,7 +92,7 @@ export function HandheldSection({ creative, technical }: { creative: GalleryPhot
     };
   }, []);
 
-  const apps = useMemo(() => buildApps({ creative, technical, playlists, now }), [creative, technical, playlists, now]);
+  const apps = useMemo(() => buildApps({ creative, technical, playlists, now, musicLoaded }), [creative, technical, playlists, now, musicLoaded]);
 
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
   const still = useMotionValue(1);
