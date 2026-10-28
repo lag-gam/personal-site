@@ -8,32 +8,6 @@ const GREEN = "#008751";
 const INK = "#18181b";
 const FONT = `ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
 
-/* Feather from /public/feather-mark.svg, as Path2D in its 100x100 box. */
-const VANE =
-  "M77 17 C 62 19, 45 31, 39 52 L 45 50.5 L 37.5 59 C 36.8 61, 36.4 63, 36.2 65 C 52 63, 68 50, 74 32 L 67.5 35 L 75.5 26 C 76.4 23, 76.9 20, 77 17 Z";
-
-export function drawFeather(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, fg: string, cut: string) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(size / 100, size / 100);
-  ctx.fillStyle = fg;
-  ctx.fill(new Path2D(VANE));
-  ctx.lineCap = "round";
-  ctx.strokeStyle = cut;
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.moveTo(74.5, 20.5);
-  ctx.lineTo(38.5, 63.5);
-  ctx.stroke();
-  ctx.strokeStyle = fg;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(40, 61.5);
-  ctx.lineTo(27, 77);
-  ctx.stroke();
-  ctx.restore();
-}
-
 function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
@@ -200,23 +174,14 @@ export function drawTop(
   greeting: string,
   caret: boolean
 ) {
-  const g = ctx.createLinearGradient(0, 0, SCREEN_W, SCREEN_H);
-  g.addColorStop(0, "#0f3d26");
-  g.addColorStop(1, "#06261a");
+  const g = ctx.createLinearGradient(0, 0, 0, SCREEN_H);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(1, "#f1f5f2");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
 
-  // soft light bloom, top right
-  const r = ctx.createRadialGradient(SCREEN_W * 0.85, SCREEN_H * 0.1, 10, SCREEN_W * 0.85, SCREEN_H * 0.1, SCREEN_W * 0.7);
-  r.addColorStop(0, "rgba(0,135,81,0.45)");
-  r.addColorStop(1, "rgba(0,135,81,0)");
-  ctx.fillStyle = r;
-  ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
-
-  drawFeather(ctx, 56, 34, 96, "#ffffff", "#0f3d26");
-
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.fillStyle = "#a1a1aa";
   ctx.font = `500 34px ${FONT}`;
   ctx.textAlign = "right";
   const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -225,26 +190,26 @@ export function drawTop(
   ctx.textAlign = "left";
 
   // typed greeting with a caret
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = INK;
   ctx.font = `700 120px ${FONT}`;
   ctx.fillText(greeting, 64, 320);
   if (caret) {
     const x = 64 + ctx.measureText(greeting).width + 10;
-    ctx.fillStyle = "#3ddc97";
+    ctx.fillStyle = GREEN;
     ctx.fillRect(x, 268, 10, 104);
   }
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillStyle = "#71717a";
   ctx.font = `500 44px ${FONT}`;
   ctx.fillText("Agam Iheanyi-Igwe \u00b7 Stanford CS", 64, 420);
 
-  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.fillStyle = "rgba(0,0,0,0.08)";
   ctx.fillRect(64, 520, SCREEN_W - 128, 2);
 
   const item = hovered >= 0 ? menu[hovered] : null;
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = item ? FOREST : INK;
   ctx.font = `600 48px ${FONT}`;
   ctx.fillText(item ? item.label : "Pick a section below.", 64, 600);
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillStyle = "#71717a";
   ctx.font = `400 38px ${FONT}`;
   ctx.fillText(item ? item.blurb : "Tap a tile on the bottom screen.", 64, 670);
 }

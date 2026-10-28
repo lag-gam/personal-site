@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { site } from "@/data/site";
 
@@ -13,13 +14,22 @@ const links = [
 
 export function Nav() {
   const [solid, setSolid] = useState(false);
+  const [overStage, setOverStage] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
-    const onScroll = () => setSolid(window.scrollY > 16);
+    const onScroll = () => {
+      const stage = pathname === "/" ? document.querySelector('section[aria-label="Menu"]') : null;
+      const onStage = !!stage && stage.getBoundingClientRect().bottom > 56;
+      setOverStage(onStage);
+      setSolid(!onStage && window.scrollY > 16);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [pathname]);
+
+  const text = overStage ? "text-zinc-400 hover:text-white" : "text-zinc-500 hover:text-forest";
 
   return (
     <header
@@ -28,16 +38,14 @@ export function Nav() {
       }`}
     >
       <nav className="mx-auto flex h-full max-w-[1200px] items-center gap-7 px-5 md:px-8">
-        <Link href="/" className="mr-auto flex items-center gap-2 text-[15px] font-semibold tracking-tight text-ink">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/feather-mark.svg" alt="" width={22} height={22} className="rounded-[6px]" />
+        <Link href="/" className={`mr-auto text-[15px] font-semibold tracking-tight ${overStage ? "text-white" : "text-ink"}`}>
           Agam Iheanyi-Igwe
         </Link>
         {links.map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className="hidden text-[13px] text-zinc-500 transition-colors hover:text-forest sm:block"
+            className={`hidden text-[13px] transition-colors sm:block ${text}`}
           >
             {l.label}
           </Link>
@@ -46,7 +54,7 @@ export function Nav() {
           href={site.resume}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[13px] text-zinc-500 transition-colors hover:text-forest"
+          className={`text-[13px] transition-colors ${text}`}
         >
           Resume
         </a>
