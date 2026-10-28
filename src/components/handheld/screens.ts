@@ -1,4 +1,4 @@
-import { HOME_GRID, LIST_ROWS, THUMB_GRID, type App, type Glyph } from "./apps";
+import { HOME_GRID, LIST_ROWS, THUMB_GRID, type App, type Glyph, type Item } from "./apps";
 
 export const SCREEN_W = 1024;
 export const SCREEN_H = 768;
@@ -6,10 +6,28 @@ export const SCREEN_H = 768;
 export const TOP_W = 1600;
 export const TOP_H = 866;
 
-/** what the device is showing: home (app -1) or inside an app */
-export type View = { app: number; tile: number; item: number };
+/**
+ * What the device is showing. app -1 is home. depth 1 is inside an item's children
+ * (a playlist's tracks), with sub as the selection there. page pages long detail text.
+ */
+export type View = { app: number; tile: number; item: number; depth: 0 | 1; sub: number; page: number };
 
+export type Media = HTMLImageElement | HTMLVideoElement;
 export type Img = (src: string | null | undefined) => HTMLImageElement | null;
+export type Vid = (src: string | null | undefined) => HTMLVideoElement | null;
+
+/** the list currently on screen: an app's items, or the children of the selected item */
+export function level(apps: App[], view: View) {
+  const app = apps[view.app];
+  if (view.depth === 1) {
+    const parent = app.items[view.item];
+    return { app, kind: "list" as const, title: parent?.title ?? app.label, items: parent?.children ?? [], sel: view.sub, empty: "Nothing here." };
+  }
+  return { app, kind: app.kind, title: app.label, items: app.items, sel: view.item, empty: app.empty };
+}
+
+const dims = (m: Media) =>
+  m instanceof HTMLVideoElement ? { w: m.videoWidth, h: m.videoHeight } : { w: m.width, h: m.height };
 
 const FOREST = "#14532d";
 const GREEN = "#008751";
@@ -48,13 +66,15 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, max: number) {
 }
 
 /** draw an image covering a box, clipped to a rounded rect */
-function cover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number, r: number, contain = false) {
+function cover(ctx: CanvasRenderingContext2D, img: Media, x: number, y: number, w: number, h: number, r: number, contain = false) {
+  const d = dims(img);
+  if (!d.w || !d.h) return placeholder(ctx, x, y, w, h, r);
   ctx.save();
   rr(ctx, x, y, w, h, r);
   ctx.clip();
-  const s = contain ? Math.min(w / img.width, h / img.height) : Math.max(w / img.width, h / img.height);
-  const dw = img.width * s;
-  const dh = img.height * s;
+  const s = contain ? Math.min(w / d.w, h / d.h) : Math.max(w / d.w, h / d.h);
+  const dw = d.w * s;
+  const dh = d.h * s;
   if (contain) {
     ctx.fillStyle = "#f4f4f5";
     ctx.fillRect(x, y, w, h);
@@ -179,6 +199,20 @@ function glyph(ctx: CanvasRenderingContext2D, g: Glyph, cx: number, cy: number, 
   ctx.restore();
 }
 
+function playBadge(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  ctx.beginPath();
+  ctx.arc(x + 22, y + 22, 24, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + 15, y + 10);
+  ctx.lineTo(x + 34, y + 22);
+  ctx.lineTo(x + 15, y + 34);
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+}
+
 /* ---------- bottom screen layout (shared by drawing and hit-testing) ---------- */
 
 const PAD_X = 48;
@@ -227,19 +261,19 @@ export function hitBottom(apps: App[], view: View, u: number, v: number): Hit {
     return null;
   }
   if (inside(x, y, BACK)) return { kind: "back" };
-  const app = apps[view.app];
-  if (app.kind === "grid") {
-    const page = Math.floor(view.item / PER_PAGE);
+  const lv = level(apps, view);
+  if (lv.kind === "grid") {
+    const page = Math.floor(lv.sel / PER_PAGE);
     for (let s = 0; s < PER_PAGE; s++) {
       const i = page * PER_PAGE + s;
-      if (i < app.items.length && inside(x, y, thumbRect(s))) return { kind: "row", i };
+      if (i < lv.items.length && inside(x, y, thumbRect(s))) return { kind: "row", i };
     }
     return null;
   }
-  const start = listStart(app.items.length, view.item);
+  const start = listStart(lv.items.length, lv.sel);
   for (let k = 0; k < LIST_ROWS; k++) {
     const i = start + k;
-    if (i >= app.items.length) break;
+    if (i >= lv.items.length) break;
     if (y >= ROW_TOP + k * ROW_H && y < ROW_TOP + (k + 1) * ROW_H && x > 16 && x < SCREEN_W - 16) return { kind: "row", i };
   }
   return null;
@@ -318,31 +352,34 @@ export function drawBottom(ctx: CanvasRenderingContext2D, apps: App[], view: Vie
     return;
   }
 
-  const app = apps[view.app];
-  const n = app.items.length;
-  header(ctx, app.label, n ? `${view.item + 1} / ${n}` : "");
+  const lv = level(apps, view);
+  const items = lv.items;
+  const sel = lv.sel;
+  const n = items.length;
+  header(ctx, fit(ctx, lv.title, 560), n ? `${sel + 1} / ${n}` : "");
 
   if (!n) {
     ctx.fillStyle = MUTED;
     ctx.font = `500 32px ${FONT}`;
     ctx.textAlign = "center";
-    wrap(ctx, app.empty ?? "Nothing here yet.", SCREEN_W - 200).forEach((l, k) =>
+    wrap(ctx, lv.empty ?? "Nothing here yet.", SCREEN_W - 200).forEach((l, k) =>
       ctx.fillText(l, SCREEN_W / 2, SCREEN_H / 2 + k * 44)
     );
     ctx.textAlign = "left";
     return;
   }
 
-  if (app.kind === "grid") {
-    const page = Math.floor(view.item / PER_PAGE);
+  if (lv.kind === "grid") {
+    const page = Math.floor(sel / PER_PAGE);
     for (let s = 0; s < PER_PAGE; s++) {
       const i = page * PER_PAGE + s;
       if (i >= n) break;
       const r = thumbRect(s);
-      const pic = img(app.items[i].image);
+      const pic = img(items[i].image);
       if (pic) cover(ctx, pic, r.x, r.y, r.w, r.h, 20);
       else placeholder(ctx, r.x, r.y, r.w, r.h, 20);
-      if (i === view.item) {
+      if (items[i].video) playBadge(ctx, r.x + r.w - 58, r.y + r.h - 58);
+      if (i === sel) {
         rr(ctx, r.x - 6, r.y - 6, r.w + 12, r.h + 12, 26);
         ctx.strokeStyle = GREEN;
         ctx.lineWidth = 8;
@@ -359,13 +396,13 @@ export function drawBottom(ctx: CanvasRenderingContext2D, apps: App[], view: Vie
     return;
   }
 
-  const start = listStart(n, view.item);
+  const start = listStart(n, sel);
   for (let k = 0; k < LIST_ROWS; k++) {
     const i = start + k;
     if (i >= n) break;
-    const it = app.items[i];
+    const it = items[i];
     const y = ROW_TOP + k * ROW_H;
-    const on = i === view.item;
+    const on = i === sel;
     if (on) {
       rr(ctx, 20, y + 6, SCREEN_W - 40, ROW_H - 12, 22);
       ctx.fillStyle = FOREST;
@@ -378,7 +415,7 @@ export function drawBottom(ctx: CanvasRenderingContext2D, apps: App[], view: Vie
     const pic = img(it.image);
     if (it.image) {
       const s = ROW_H - 34;
-      if (pic) cover(ctx, pic, tx, y + 17, s, s, 12, app.id === "experience");
+      if (pic) cover(ctx, pic, tx, y + 17, s, s, 12, lv.app.id === "experience");
       else placeholder(ctx, tx, y + 17, s, s, 12);
       tx += s + 22;
     }
@@ -547,41 +584,46 @@ function preview(ctx: CanvasRenderingContext2D, app: App, index: number, total: 
   });
 }
 
-function detail(ctx: CanvasRenderingContext2D, app: App, view: View, img: Img) {
-  const it = app.items[view.item];
+/** returns how many pages the detail text needs, so the d-pad knows how far left/right can go */
+function detail(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img, vid: Vid, muted: boolean): number {
+  const lv = level(apps, view);
+  const it: Item | undefined = lv.items[lv.sel];
   if (!it) {
     ctx.fillStyle = FAINT;
     ctx.font = `500 40px ${FONT}`;
-    ctx.fillText(app.empty ?? "Nothing here yet.", X, 300);
+    ctx.fillText(lv.empty ?? "Nothing here yet.", X, 300);
     footer(ctx, ["B Back"]);
-    return;
+    return 1;
   }
 
-  // gallery: the photo is the page
-  if (app.kind === "grid") {
-    const pic = img(it.image);
-    const box = { x: X, y: 140, w: TOP_W - X * 2, h: 600 };
-    if (pic) cover(ctx, pic, box.x, box.y, box.w, box.h, 28, true);
+  // gallery: the photo or film is the page
+  if (lv.kind === "grid") {
+    const v = it.video ? vid(it.video) : null;
+    const media: Media | null = v && v.readyState >= 2 ? v : img(it.image);
+    const box = { x: X, y: 138, w: TOP_W - X * 2, h: 610 };
+    if (media) cover(ctx, media, box.x, box.y, box.w, box.h, 28, true);
     else placeholder(ctx, box.x, box.y, box.w, box.h, 28);
     ctx.fillStyle = INK;
     ctx.font = `600 38px ${FONT}`;
-    ctx.fillText(it.title, X, 808);
-    if (it.meta) {
-      ctx.fillStyle = FAINT;
-      ctx.textAlign = "right";
-      ctx.fillText(it.meta, TOP_W - X, 808);
-      ctx.textAlign = "left";
+    ctx.fillText(it.title, X, 812);
+    ctx.font = `500 32px ${FONT}`;
+    ctx.fillStyle = FAINT;
+    ctx.textAlign = "right";
+    ctx.fillText(it.video ? `A  Sound ${muted ? "on" : "off"}` : it.meta ?? "", TOP_W - X, 812);
+    ctx.textAlign = "left";
+    if (it.video && it.meta) {
+      ctx.fillText(it.meta, X + ctx.measureText(it.title).width + 40, 812);
     }
-    return;
+    return 1;
   }
 
   let tx = X;
   const pic = img(it.image);
   if (it.image) {
-    const s = 360;
-    if (pic) cover(ctx, pic, X, 160, s, s, 32, app.id === "experience");
-    else placeholder(ctx, X, 160, s, s, 32);
-    tx = X + s + 64;
+    const sz = 360;
+    if (pic) cover(ctx, pic, X, 160, sz, sz, 32, lv.app.id === "experience");
+    else placeholder(ctx, X, 160, sz, sz, 32);
+    tx = X + sz + 64;
   }
   const maxW = TOP_W - X - tx;
 
@@ -603,31 +645,48 @@ function detail(ctx: CanvasRenderingContext2D, app: App, view: View, img: Img) {
     y += 74;
   } else y += 20;
 
+  // lay out body lines, then show the requested page of them
   const bottom = 740;
-  if (it.body?.length) {
-    ctx.font = `400 34px ${FONT}`;
-    ctx.fillStyle = "#3f3f46";
-    const indent = it.bullets ? 34 : 0;
-    outer: for (const para of it.body) {
-      const lines = wrap(ctx, para, maxW - indent);
-      for (let k = 0; k < lines.length; k++) {
-        if (y > bottom) break outer;
-        if (k === 0 && it.bullets) {
-          ctx.beginPath();
-          ctx.arc(tx + 8, y, 6, 0, Math.PI * 2);
-          ctx.fillStyle = GREEN;
-          ctx.fill();
-          ctx.fillStyle = "#3f3f46";
-        }
-        ctx.fillText(lines[k], tx + indent, y);
-        y += 48;
-      }
-      y += it.bullets ? 8 : 16;
-    }
+  const LH = 48;
+  ctx.font = `400 34px ${FONT}`;
+  const indent = it.bullets ? 34 : 0;
+  type Line = { text: string; bullet: boolean; gap: number };
+  const lines: Line[] = [];
+  for (const para of it.body ?? []) {
+    wrap(ctx, para, maxW - indent).forEach((text, k) => lines.push({ text, bullet: !!it.bullets && k === 0, gap: 0 }));
+    if (lines.length) lines[lines.length - 1].gap = it.bullets ? 8 : 18;
   }
-  if (it.tags?.length && y < bottom) chips(ctx, it.tags, tx, y + 14, TOP_W - X, bottom);
+  const perPage = Math.max(1, Math.floor((bottom - y) / LH));
+  const pages = Math.max(1, Math.ceil(lines.length / perPage) + (it.tags?.length && lines.length % perPage > perPage - 2 ? 1 : 0));
+  const page = Math.min(view.page, pages - 1);
+  const slice = lines.slice(page * perPage, (page + 1) * perPage);
+  ctx.fillStyle = "#3f3f46";
+  for (const l of slice) {
+    if (l.bullet) {
+      ctx.beginPath();
+      ctx.arc(tx + 8, y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = GREEN;
+      ctx.fill();
+      ctx.fillStyle = "#3f3f46";
+    }
+    ctx.fillText(l.text, tx + indent, y);
+    y += LH + l.gap;
+  }
+  if (it.tags?.length && page === pages - 1 && y < bottom) chips(ctx, it.tags, tx, y + 14, TOP_W - X, bottom);
 
-  footer(ctx, it.href ? [`A ${it.hrefLabel ?? "Open"}`, "B Back"] : ["B Back"]);
+  const parts: string[] = [];
+  if (it.children?.length) parts.push(`A ${it.childrenLabel ?? "Open"}`);
+  else if (it.href) parts.push(`A ${it.hrefLabel ?? "Open"}`);
+  parts.push("B Back");
+  footer(ctx, parts);
+  if (pages > 1) {
+    ctx.font = `600 32px ${FONT}`;
+    ctx.fillStyle = FAINT;
+    ctx.textAlign = "right";
+    ctx.fillText(`\u25C0  ${page + 1} / ${pages}  \u25B6`, TOP_W - X, 820);
+    ctx.textAlign = "left";
+  }
+  return pages;
 }
 
 export function drawTop(
@@ -638,16 +697,18 @@ export function drawTop(
   greeting: string,
   caret: boolean,
   face: HTMLImageElement | null,
-  img: Img
-) {
+  img: Img,
+  vid: Vid,
+  muted: boolean
+): number {
   if (view.app < 0) {
     const app = view.tile >= 0 ? apps[view.tile] : null;
     status(ctx, "Agam Iheanyi-Igwe", now);
     if (app) preview(ctx, app, view.tile, apps.length);
     else home(ctx, greeting, caret, face);
-    return;
+    return 1;
   }
   const app = apps[view.app];
-  status(ctx, app.label, now);
-  detail(ctx, app, view, img);
+  status(ctx, view.depth ? `${app.label}  \u203A  ${apps[view.app].items[view.item]?.title ?? ""}` : app.label, now);
+  return detail(ctx, apps, view, img, vid, muted);
 }

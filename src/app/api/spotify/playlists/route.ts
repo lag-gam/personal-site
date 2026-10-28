@@ -9,14 +9,15 @@ export type PlaylistInfo = {
   url: string;
   image: string | null;
   total: number | null;
-  tracks: { name: string; artists: string }[];
+  tracks: { name: string; artists: string; album: string; image: string | null; url: string; duration_ms: number }[];
 };
 
-// playlists change rarely; refresh hourly
-export const revalidate = 3600;
+// run per request so a bad build-time result never sticks; Spotify responses are cached for an hour
+export const dynamic = "force-dynamic";
+const revalidate = 3600;
 
 const FIELDS =
-  "name,description,external_urls(spotify),images(url),tracks(total,items(track(name,artists(name))))";
+  "name,description,external_urls(spotify),images(url),tracks(total,items(track(name,duration_ms,external_urls(spotify),artists(name),album(name,images(url)))))";
 
 async function viaApi(id: string, token: string): Promise<PlaylistInfo> {
   const res = await fetch(`https://api.spotify.com/v1/playlists/${id}?fields=${encodeURIComponent(FIELDS)}`, {
@@ -29,7 +30,18 @@ async function viaApi(id: string, token: string): Promise<PlaylistInfo> {
     description?: string;
     external_urls: { spotify: string };
     images?: { url: string }[];
-    tracks: { total: number; items: { track: { name: string; artists: { name: string }[] } | null }[] };
+    tracks: {
+      total: number;
+      items: {
+        track: {
+          name: string;
+          duration_ms: number;
+          external_urls: { spotify: string };
+          artists: { name: string }[];
+          album: { name: string; images?: { url: string }[] };
+        } | null;
+      }[];
+    };
   };
   return {
     id,
@@ -40,8 +52,15 @@ async function viaApi(id: string, token: string): Promise<PlaylistInfo> {
     total: j.tracks.total,
     tracks: j.tracks.items
       .filter((i) => i.track)
-      .slice(0, 8)
-      .map((i) => ({ name: i.track!.name, artists: i.track!.artists.map((a) => a.name).join(", ") })),
+      .slice(0, 50)
+      .map(({ track: t }) => ({
+        name: t!.name,
+        artists: t!.artists.map((a) => a.name).join(", "),
+        album: t!.album.name,
+        image: t!.album.images?.at(-1)?.url ?? t!.album.images?.[0]?.url ?? null,
+        url: t!.external_urls.spotify,
+        duration_ms: t!.duration_ms,
+      })),
   };
 }
 
@@ -76,7 +95,8 @@ export async function GET() {
     playlists.map(async ({ id }, i) => {
       try {
         return token ? await viaApi(id, token) : await viaOembed(id);
-      } catch {
+      } catch (err) {
+        console.error("[spotify playlists]", id, err);
         // Spotify unreachable: still list it, so it can be opened
         return viaOembed(id).catch(() => bare(id, i));
       }

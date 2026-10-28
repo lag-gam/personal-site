@@ -15,9 +15,14 @@ export type Item = {
   tags?: string[];
   /** square art on the detail page, or the whole picture for gallery apps */
   image?: string | null;
+  /** gallery clips: plays on the top screen; image is its poster */
+  video?: string;
   /** A opens this; external links go to a new tab */
   href?: string;
   hrefLabel?: string;
+  /** A steps into these (a playlist's tracks); B steps back out */
+  children?: Item[];
+  childrenLabel?: string;
 };
 
 export type App = {
@@ -32,7 +37,7 @@ export type App = {
   empty?: string;
 };
 
-export type GalleryPhoto = { src: string; caption: string; place?: string };
+export type GalleryPhoto = { src: string; caption: string; place?: string; video?: string };
 
 export type NowPlaying = {
   playing: boolean;
@@ -50,8 +55,11 @@ export type Playlist = {
   url: string;
   image: string | null;
   total: number | null;
-  tracks: { name: string; artists: string }[];
+  tracks: { name: string; artists: string; album?: string; image?: string | null; url?: string; duration_ms?: number }[];
 };
+
+const mmss = (ms?: number) =>
+  ms == null ? "" : `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
 
 const handle = (url: string) => url.replace(/^https?:\/\/(www\.)?/, "");
 
@@ -61,7 +69,6 @@ export const proxied = (url: string | null | undefined, w = 384) =>
 
 export function buildApps(data: {
   creative: GalleryPhoto[];
-  technical: GalleryPhoto[];
   playlists: Playlist[];
   now: NowPlaying;
   musicLoaded: boolean;
@@ -69,7 +76,8 @@ export function buildApps(data: {
   const photo = (p: GalleryPhoto): Item => ({
     title: p.caption,
     meta: p.place,
-    image: p.src,
+    image: p.src || null,
+    video: p.video,
   });
 
   const music: Item[] = [];
@@ -85,15 +93,26 @@ export function buildApps(data: {
     });
   }
   for (const p of data.playlists) {
+    const tracks: Item[] = p.tracks.map((t) => ({
+      title: t.name,
+      subtitle: t.artists,
+      meta: mmss(t.duration_ms),
+      body: t.album ? [t.album] : undefined,
+      image: proxied(t.image, 256),
+      href: t.url ?? p.url,
+      hrefLabel: "Play in Spotify",
+    }));
     music.push({
       title: p.name,
       subtitle: p.description || undefined,
       meta: p.total != null ? `${p.total} songs` : "Playlist",
-      body: p.tracks.map((t) => `${t.name}  ·  ${t.artists}`),
+      body: p.tracks.slice(0, 6).map((t) => `${t.name}  ·  ${t.artists}`),
       bullets: true,
       image: proxied(p.image),
       href: p.url,
       hrefLabel: "Open in Spotify",
+      children: tracks.length ? tracks : undefined,
+      childrenLabel: "See tracks",
     });
   }
 
@@ -116,23 +135,6 @@ export function buildApps(data: {
       })),
     },
     {
-      id: "projects",
-      label: "Projects",
-      blurb: "Things I've built on my own.",
-      glyph: "code",
-      kind: "list",
-      items: projects.map((p) => ({
-        title: p.title,
-        subtitle: p.kicker,
-        meta: p.kicker.split(" · ")[1] ?? "",
-        body: [p.summary],
-        tags: p.stack,
-        image: p.image,
-        href: p.github ?? p.link?.href,
-        hrefLabel: p.github ? "View on GitHub" : p.link?.label,
-      })),
-    },
-    {
       id: "music",
       label: "Music",
       blurb: "What I'm listening to.",
@@ -144,7 +146,7 @@ export function buildApps(data: {
     {
       id: "creative",
       label: "Creative",
-      blurb: "Creative Works. Photos, travel, making.",
+      blurb: "Creative Works. Photos and films.",
       glyph: "camera",
       kind: "grid",
       items: data.creative.map(photo),
@@ -153,11 +155,19 @@ export function buildApps(data: {
     {
       id: "technical",
       label: "Technical",
-      blurb: "Technical Works. Builds, boards, setups.",
-      glyph: "chip",
-      kind: "grid",
-      items: data.technical.map(photo),
-      empty: "No photos yet. Add them to /public/gallery/technical.",
+      blurb: "Technical Works. Things I've built.",
+      glyph: "code",
+      kind: "list",
+      items: projects.map((p) => ({
+        title: p.title,
+        subtitle: p.kicker,
+        meta: p.kicker.split(" · ")[1] ?? "",
+        body: [p.summary, ...(p.detail ? [p.detail] : [])],
+        tags: p.stack,
+        image: p.image,
+        href: p.github ?? p.link?.href,
+        hrefLabel: p.github ? "View on GitHub" : p.link?.label,
+      })),
     },
     {
       id: "about",

@@ -7,7 +7,7 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { MotionValue } from "motion/react";
 import { HOME_GRID, THUMB_GRID, type App } from "./apps";
-import { SCREEN_H, SCREEN_W, TOP_H, TOP_W, drawBottom, drawTop, hitBottom, type View } from "./screens";
+import { SCREEN_H, SCREEN_W, TOP_H, TOP_W, drawBottom, drawTop, hitBottom, level, type View } from "./screens";
 
 /*
   An original dual-screen clamshell, and the whole site lives on it.
@@ -46,14 +46,47 @@ function useScreenTexture(w: number, h: number, draw: (ctx: CanvasRenderingConte
     t.anisotropy = 8;
     return t;
   }, [canvas]);
-  useEffect(() => {
+  const drawRef = useRef(draw);
+  drawRef.current = draw;
+  const redraw = useCallback(() => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    draw(ctx);
+    drawRef.current(ctx);
     texture.needsUpdate = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  return texture;
+  }, [canvas, texture]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(redraw, deps);
+  return { texture, redraw };
+}
+
+/** one muted, looping <video> per clip; only the selected one plays */
+function useVideos() {
+  const cache = useRef(new Map<string, HTMLVideoElement>());
+  const [, bump] = useState(0);
+  const vid = useCallback((src: string | null | undefined) => {
+    if (!src) return null;
+    let v = cache.current.get(src);
+    if (!v) {
+      v = document.createElement("video");
+      v.src = src;
+      v.muted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.preload = "auto";
+      v.addEventListener("loadeddata", () => bump((n) => n + 1), { once: true });
+      cache.current.set(src, v);
+    }
+    return v;
+  }, []);
+  const playOnly = useCallback((src: string | null, muted: boolean) => {
+    cache.current.forEach((v, k) => {
+      if (k === src) {
+        v.muted = muted;
+        if (v.paused) v.play().catch(() => {});
+      } else if (!v.paused) v.pause();
+    });
+  }, []);
+  return { vid, playOnly };
 }
 
 /** lazy image cache; bumps a version whenever something finishes loading so screens redraw */
@@ -134,7 +167,13 @@ function Device({
   const { img, version } = useImages();
   const cross = useCross();
 
-  const [view, setView] = useState<View>({ app: -1, tile: -1, item: 0 });
+  const HOME: View = { app: -1, tile: -1, item: 0, depth: 0, sub: 0, page: 0 };
+  const [view, setView] = useState<View>(HOME);
+  const { vid, playOnly } = useVideos();
+  const [muted, setMuted] = useState(true);
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
+  const pagesRef = useRef(1);
   const viewRef = useRef(view);
   viewRef.current = view;
   const appsRef = useRef(apps);
@@ -164,13 +203,26 @@ function Device({
 
   const face = img("/headshot.jpg");
 
-  const topTex = useScreenTexture(
+  const top = useScreenTexture(
     TOP_W,
     TOP_H,
-    (ctx) => drawTop(ctx, apps, view, now, GREETING.slice(0, typed), typed < GREETING.length || blink, face, img),
-    [apps, view, now, typed, blink, version]
+    (ctx) => {
+      pagesRef.current = drawTop(ctx, apps, view, now, GREETING.slice(0, typed), typed < GREETING.length || blink, face, img, vid, muted);
+    },
+    [apps, view, now, typed, blink, version, muted]
   );
-  const botTex = useScreenTexture(SCREEN_W, SCREEN_H, (ctx) => drawBottom(ctx, apps, view, img), [apps, view, version]);
+  const bottom = useScreenTexture(SCREEN_W, SCREEN_H, (ctx) => drawBottom(ctx, apps, view, img), [apps, view, version]);
+  const topTex = top.texture;
+  const botTex = bottom.texture;
+
+  // the selected clip in a gallery plays on the top screen; everything else pauses
+  const activeVideo = (() => {
+    if (view.app < 0) return null;
+    const lv = level(apps, view);
+    return lv.kind === "grid" ? lv.items[lv.sel]?.video ?? null : null;
+  })();
+  useEffect(() => playOnly(activeVideo, muted), [activeVideo, muted, playOnly]);
+  const lastFrame = useRef(0);
 
   /* ---------- navigation ---------- */
 
@@ -186,7 +238,7 @@ function Device({
     if (app.kind === "link") {
       if (app.href) onOpen(app.href);
       setView((v) => ({ ...v, tile: i }));
-    } else setView({ app: i, tile: i, item: 0 });
+    } else setView({ ...HOME, app: i, tile: i });
   };
 
   const move = (dx: number, dy: number) => {
@@ -198,11 +250,14 @@ function Device({
         const r = (Math.floor(v.tile / HOME_GRID.cols) + dy + HOME_GRID.rows) % HOME_GRID.rows;
         return { ...v, tile: Math.min(r * HOME_GRID.cols + c, appsRef.current.length - 1) };
       }
-      const app = appsRef.current[v.app];
-      const n = app.items.length;
+      const lv = level(appsRef.current, v);
+      const n = lv.items.length;
       if (!n) return v;
-      const step = app.kind === "grid" ? dx + dy * THUMB_GRID.cols : dy || dx;
-      return { ...v, item: clamp(v.item + step, 0, n - 1) };
+      // long detail text: left/right turn pages
+      if (lv.kind !== "grid" && dx && pagesRef.current > 1) return { ...v, page: clamp(v.page + dx, 0, pagesRef.current - 1) };
+      const step = lv.kind === "grid" ? dx + dy * THUMB_GRID.cols : dy || dx;
+      const next = clamp(lv.sel + step, 0, n - 1);
+      return v.depth ? { ...v, sub: next, page: 0 } : { ...v, item: next, page: 0 };
     });
   };
 
@@ -214,12 +269,18 @@ function Device({
       else setView({ ...v, tile: 0 });
       return;
     }
-    const it = appsRef.current[v.app]?.items[v.item];
-    if (it?.href) onOpen(it.href);
+    const lv = level(appsRef.current, v);
+    const it = lv.items[lv.sel];
+    if (!it) return;
+    if (!v.depth && it.children?.length) setView({ ...v, depth: 1, sub: 0, page: 0 });
+    else if (it.video) setMuted((m) => !m);
+    else if (it.href) onOpen(it.href);
   };
 
   const back = () =>
-    setView((v) => (v.app >= 0 ? { app: -1, tile: v.app, item: 0 } : { ...v, tile: -1 }));
+    setView((v) =>
+      v.depth ? { ...v, depth: 0, page: 0 } : v.app >= 0 ? { ...HOME, tile: v.app } : { ...v, tile: -1 }
+    );
 
   // keys work anywhere once the device is open
   useEffect(() => {
@@ -252,7 +313,12 @@ function Device({
     const h = hitBottom(appsRef.current, viewRef.current, e.uv.x, e.uv.y);
     cursor(!!h);
     if (h?.kind === "tile") setView((v) => (v.tile === h.i ? v : { ...v, tile: h.i }));
-    if (h?.kind === "row") setView((v) => (v.item === h.i ? v : { ...v, item: h.i }));
+    if (h?.kind === "row")
+      setView((v) => {
+        const sel = v.depth ? v.sub : v.item;
+        if (sel === h.i) return v;
+        return v.depth ? { ...v, sub: h.i, page: 0 } : { ...v, item: h.i, page: 0 };
+      });
   };
   const tap = (e: ThreeEvent<MouseEvent>) => {
     if (!live.current || !e.uv) return;
@@ -263,8 +329,9 @@ function Device({
     if (h.kind === "back") return back();
     if (h.kind === "tile") return v.tile === h.i ? enter(h.i) : setView({ ...v, tile: h.i });
     if (h.kind === "row") {
-      if (v.item === h.i) activate();
-      else setView({ ...v, item: h.i });
+      const sel = v.depth ? v.sub : v.item;
+      if (sel === h.i) activate();
+      else setView(v.depth ? { ...v, sub: h.i, page: 0 } : { ...v, item: h.i, page: 0 });
     }
   };
   const pad = (e: ThreeEvent<MouseEvent>) => {
@@ -346,6 +413,11 @@ function Device({
       if (g) g.position.y = BASE_T - 0.014 * Math.max(0, 1 - (t - btnPress.current[k]) / 160);
     });
 
+    if (activeVideo && t - lastFrame.current > 33) {
+      lastFrame.current = t;
+      top.redraw();
+    }
+
     const c = 0.05 + 0.96 * power;
     topMat.current?.color.setScalar(c);
     botMat.current?.color.setScalar(c);
@@ -359,7 +431,6 @@ function Device({
   );
   const inner = <meshPhysicalMaterial color={INNER} roughness={0.3} metalness={0.05} clearcoat={0.8} clearcoatRoughness={0.08} />;
   const dark = <meshPhysicalMaterial color={DARK} roughness={0.28} metalness={0.3} clearcoat={1} clearcoatRoughness={0.05} />;
-  const chrome = <meshPhysicalMaterial color="#f4f4f4" metalness={1} roughness={0.07} clearcoat={1} clearcoatRoughness={0.02} envMapIntensity={1.6} />;
 
   return (
     <group ref={root}>
@@ -438,13 +509,11 @@ function Device({
         <RoundedBox args={[W, LID_T, D]} radius={0.05} smoothness={5} position={[0, LID_T / 2, D / 2]} castShadow receiveShadow>
           {shell}
         </RoundedBox>
-        {/* outer face: a polished chrome inlay set into the red */}
-        <RoundedBox args={[0.74, 0.008, 0.15]} radius={0.003} smoothness={2} position={[0, LID_T + 0.002, D / 2 + 0.44]}>
-          {chrome}
-        </RoundedBox>
-        <RoundedBox args={[W - 0.16, 0.004, 0.012]} radius={0.0015} smoothness={2} position={[0, LID_T + 0.0005, D - 0.06]}>
-          {chrome}
-        </RoundedBox>
+        {/* outer face: one small plastic disc in the front corner */}
+        <mesh position={[W / 2 - 0.2, LID_T + 0.003, D - 0.2]} castShadow>
+          <cylinderGeometry args={[0.07, 0.07, 0.006, 48]} />
+          <meshPhysicalMaterial color="#1a1b1d" roughness={0.42} metalness={0} clearcoat={0.25} clearcoatRoughness={0.5} />
+        </mesh>
         {/* inner face: bezel and an edge-to-edge top screen */}
         <RoundedBox args={[W - 0.12, 0.01, D - 0.12]} radius={0.004} smoothness={2} position={[0, -0.003, D / 2]}>
           {inner}

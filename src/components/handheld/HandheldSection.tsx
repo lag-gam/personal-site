@@ -63,7 +63,7 @@ function PlainSite({ apps, visible }: { apps: App[]; visible: boolean }) {
   The whole site. A tall section with a sticky stage; scroll progress opens the handheld,
   and from then on the device is the navigation.
 */
-export function HandheldSection({ creative, technical }: { creative: GalleryPhoto[]; technical: GalleryPhoto[] }) {
+export function HandheldSection({ creative }: { creative: GalleryPhoto[] }) {
   const ref = useRef<HTMLElement>(null);
   const reduced = useReducedMotion();
   const [gl, setGl] = useState<boolean | null>(null);
@@ -92,7 +92,7 @@ export function HandheldSection({ creative, technical }: { creative: GalleryPhot
     };
   }, []);
 
-  const apps = useMemo(() => buildApps({ creative, technical, playlists, now, musicLoaded }), [creative, technical, playlists, now, musicLoaded]);
+  const apps = useMemo(() => buildApps({ creative, playlists, now, musicLoaded }), [creative, playlists, now, musicLoaded]);
 
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
   const still = useMotionValue(1);

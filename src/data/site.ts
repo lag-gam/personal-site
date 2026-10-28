@@ -177,17 +177,23 @@ export const site = {
 export type GalleryCategory = "creative" | "technical";
 
 /**
- * The gallery reads straight from /public/gallery/creative and
- * /public/gallery/technical, sorted by filename (prefix 01-, 02- to order).
+ * The Creative gallery reads straight from /public/gallery/creative, sorted by
+ * filename (prefix 01-, 02- to order). Videos are .mp4 with a matching
+ * <name>.poster.jpg for the thumbnail.
  * Captions are optional: key by filename. Anything without one gets a caption
  * made from its filename, so "tokyo-japan.jpg" shows as "Tokyo Japan".
  */
 export const galleryCaptions: Record<string, { caption: string; place?: string }> = {
-  "yosemite.jpg": { caption: "Yosemite", place: "California" },
-  "rio-1.jpg": { caption: "Rio de Janeiro", place: "Brazil" },
-  "rio-2.jpg": { caption: "Rio de Janeiro", place: "Brazil" },
-  "tokyo.jpg": { caption: "Tokyo", place: "Japan" },
-  "seattle.jpg": { caption: "Seattle", place: "Washington" },
+  "01-japan.mp4": { caption: "Japan", place: "Film" },
+  "02-bamboo-grove.jpg": { caption: "Bamboo grove", place: "Arashiyama, Kyoto" },
+  "03-deer.jpg": { caption: "Deer", place: "Japan" },
+  "04-rio.mp4": { caption: "Rio de Janeiro", place: "Film" },
+  "05-river-boat.jpg": { caption: "River boat", place: "Arashiyama, Kyoto" },
+  "06-midtown.jpg": { caption: "Midtown from above", place: "New York" },
+  "07-yosemite.mp4": { caption: "Yosemite", place: "Film" },
+  "08-e-32nd-st.jpg": { caption: "E 32nd St", place: "New York" },
+  "09-arashiyama-dusk.jpg": { caption: "Dusk", place: "Arashiyama, Kyoto" },
+  "10-the-weir.jpg": { caption: "The weir", place: "Arashiyama, Kyoto" },
 };
 
 export type Involvement = {
