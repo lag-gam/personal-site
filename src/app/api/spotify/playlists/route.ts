@@ -12,15 +12,27 @@ export type PlaylistInfo = {
   tracks: { name: string; artists: string; album: string; image: string | null; url: string; duration_ms: number }[];
 };
 
-// run per request so a bad build-time result never sticks; Spotify responses are cached for an hour
+/** where the data came from, so a missing key or a Spotify change is visible at /api/spotify/playlists */
+type Source = "api" | "oembed" | "none";
+
 export const dynamic = "force-dynamic";
 const revalidate = 3600;
 
-const FIELDS =
-  "name,description,external_urls(spotify),images(url),tracks(total,items(track(name,duration_ms,external_urls(spotify),artists(name),album(name,images(url)))))";
+type RawTrack = {
+  name: string;
+  duration_ms: number;
+  external_urls: { spotify: string };
+  artists: { name: string }[];
+  album: { name: string; images?: { url: string }[] };
+} | null;
 
+/*
+  Spotify's February 2026 Web API update renamed a playlist's `tracks` to `items`, and each
+  entry's `track` to `item`. Read either shape so this keeps working on old and new responses.
+  Contents only come back for playlists the account owns or collaborates on.
+*/
 async function viaApi(id: string, token: string): Promise<PlaylistInfo> {
-  const res = await fetch(`https://api.spotify.com/v1/playlists/${id}?fields=${encodeURIComponent(FIELDS)}`, {
+  const res = await fetch(`https://api.spotify.com/v1/playlists/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
     next: { revalidate },
   });
@@ -29,38 +41,27 @@ async function viaApi(id: string, token: string): Promise<PlaylistInfo> {
     name: string;
     description?: string;
     external_urls: { spotify: string };
-    images?: { url: string }[];
-    tracks: {
-      total: number;
-      items: {
-        track: {
-          name: string;
-          duration_ms: number;
-          external_urls: { spotify: string };
-          artists: { name: string }[];
-          album: { name: string; images?: { url: string }[] };
-        } | null;
-      }[];
-    };
+    images?: { url: string }[] | null;
+    items?: { total?: number; items?: { item?: RawTrack; track?: RawTrack }[] };
+    tracks?: { total?: number; items?: { item?: RawTrack; track?: RawTrack }[] };
   };
+  const list = j.items ?? j.tracks;
+  const entries = (list?.items ?? []).map((e) => e.item ?? e.track ?? null).filter((t): t is NonNullable<RawTrack> => !!t);
   return {
     id,
     name: j.name,
     description: (j.description ?? "").replace(/<[^>]+>/g, ""),
     url: j.external_urls.spotify,
     image: j.images?.[0]?.url ?? null,
-    total: j.tracks.total,
-    tracks: j.tracks.items
-      .filter((i) => i.track)
-      .slice(0, 50)
-      .map(({ track: t }) => ({
-        name: t!.name,
-        artists: t!.artists.map((a) => a.name).join(", "),
-        album: t!.album.name,
-        image: t!.album.images?.at(-1)?.url ?? t!.album.images?.[0]?.url ?? null,
-        url: t!.external_urls.spotify,
-        duration_ms: t!.duration_ms,
-      })),
+    total: list?.total ?? null,
+    tracks: entries.slice(0, 50).map((t) => ({
+      name: t.name,
+      artists: t.artists.map((a) => a.name).join(", "),
+      album: t.album.name,
+      image: t.album.images?.at(-1)?.url ?? t.album.images?.[0]?.url ?? null,
+      url: t.external_urls.spotify,
+      duration_ms: t.duration_ms,
+    })),
   };
 }
 
@@ -74,14 +75,17 @@ async function viaOembed(id: string): Promise<PlaylistInfo> {
 
 export async function GET() {
   const creds = spotifyCreds();
+  const problems: string[] = [];
   let token: string | null = null;
-  if (creds) {
+  if (!creds) problems.push("Spotify keys are not set on this deployment");
+  else {
     try {
       token = await accessToken(creds.id, creds.secret, creds.refresh);
     } catch (err) {
-      console.error("[spotify playlists] token", err);
+      problems.push(`sign-in failed (${(err as Error).message})`);
     }
   }
+
   const bare = (id: string, i: number): PlaylistInfo => ({
     id,
     name: `Playlist ${i + 1}`,
@@ -91,16 +95,35 @@ export async function GET() {
     total: null,
     tracks: [],
   });
+
+  let source: Source = token ? "api" : "oembed";
   const out = await Promise.all(
     playlists.map(async ({ id }, i) => {
-      try {
-        return token ? await viaApi(id, token) : await viaOembed(id);
-      } catch (err) {
-        console.error("[spotify playlists]", id, err);
-        // Spotify unreachable: still list it, so it can be opened
-        return viaOembed(id).catch(() => bare(id, i));
+      if (token) {
+        try {
+          return await viaApi(id, token);
+        } catch (err) {
+          problems.push(`${id}: ${(err as Error).message}`);
+          source = "oembed";
+        }
       }
+      return viaOembed(id).catch(() => {
+        source = "none";
+        return bare(id, i);
+      });
     })
   );
-  return NextResponse.json({ playlists: out });
+
+  // a good answer is cached at the edge for an hour; a degraded one only briefly, so a fix shows up fast
+  const ok = source === "api" && problems.length === 0;
+  return NextResponse.json(
+    { playlists: out, source, problems },
+    {
+      headers: {
+        "Cache-Control": ok
+          ? "public, s-maxage=3600, stale-while-revalidate=86400"
+          : "public, s-maxage=60, stale-while-revalidate=300",
+      },
+    }
+  );
 }

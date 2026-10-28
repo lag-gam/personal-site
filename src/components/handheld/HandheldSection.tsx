@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMotionValue, useReducedMotion, useScroll } from "motion/react";
-import { buildApps, type App, type GalleryPhoto, type NowPlaying, type Playlist } from "./apps";
+import { buildApps, proxied, type App, type GalleryPhoto, type NowPlaying, type Playlist } from "./apps";
 import { Controls } from "./Controls";
 
 const Scene = dynamic(() => import("./Scene"), { ssr: false });
@@ -75,9 +75,37 @@ export function HandheldSection({ creative }: { creative: GalleryPhoto[] }) {
   const [musicLoaded, setMusicLoaded] = useState(false);
   useEffect(() => {
     let alive = true;
+    // last good copy from this browser shows instantly; the network refresh replaces it quietly
+    const CACHE = "spotify-playlists-v2";
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE) ?? "null") as { playlists: Playlist[] } | null;
+      if (cached?.playlists?.length) {
+        setPlaylists(cached.playlists);
+        setMusicLoaded(true);
+      }
+    } catch {}
+    const warm = (list: Playlist[]) =>
+      list.forEach((p) => {
+        const src = proxied(p.image);
+        if (src) new Image().src = src;
+      });
     fetch("/api/spotify/playlists")
       .then((r) => r.json())
-      .then((d: { playlists?: Playlist[] }) => alive && setPlaylists(d.playlists ?? []))
+      .then((d: { playlists?: Playlist[]; source?: string }) => {
+        if (!alive || !d.playlists) return;
+        let hasCache = false;
+        try {
+          hasCache = !!localStorage.getItem(CACHE);
+        } catch {}
+        // never replace a good cached copy with a degraded answer
+        if (d.source === "api" || !hasCache) setPlaylists(d.playlists);
+        if (d.source === "api") {
+          try {
+            localStorage.setItem(CACHE, JSON.stringify({ playlists: d.playlists }));
+          } catch {}
+        }
+        warm(d.playlists);
+      })
       .catch(() => {})
       .finally(() => alive && setMusicLoaded(true));
     const loadNow = () =>
@@ -86,7 +114,7 @@ export function HandheldSection({ creative }: { creative: GalleryPhoto[] }) {
         .then((d: { track: NowPlaying }) => alive && setNow(d.track ?? null))
         .catch(() => {});
     loadNow();
-    const id = setInterval(loadNow, 60_000);
+    const id = setInterval(loadNow, 30_000);
     return () => {
       alive = false;
       clearInterval(id);

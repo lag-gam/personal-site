@@ -444,8 +444,8 @@ function Device({
 
   const look = useMemo(() => new THREE.Vector3(), []);
   // three camera stops: closed, open, and flat (looking straight down at both screens)
-  const camClosed = useMemo(() => new THREE.Vector3(0, 4.6, 2.75), []);
-  const camOpen = useMemo(() => new THREE.Vector3(0, 1.95, 3.7), []);
+  const camClosed = useMemo(() => new THREE.Vector3(0, 4.0, 2.4), []);
+  const camOpen = useMemo(() => new THREE.Vector3(0, 1.72, 3.18), []);
   const camFlat = useMemo(() => new THREE.Vector3(0, 5.55, -0.2), []);
   const lookClosed = useMemo(() => new THREE.Vector3(0, 0.1, 0.15), []);
   const lookOpen = useMemo(() => new THREE.Vector3(0, 0.5, -0.3), []);
@@ -479,7 +479,7 @@ function Device({
 
     const aspect = size.width / size.height;
     // narrow screens pull the camera back along its line of sight
-    const fit = Math.max(1, 1.45 / aspect);
+    const fit = Math.max(1, 1.6 / aspect);
     look.lerpVectors(lookClosed, lookOpen, open).lerp(lookFlat, flat);
     tmp.lerpVectors(camClosed, camOpen, open).lerp(camFlat, flat);
     tmp2.subVectors(tmp, look).multiplyScalar(fit);

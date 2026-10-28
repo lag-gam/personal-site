@@ -23,8 +23,9 @@ const shape = (t: Track, playing: boolean, progress_ms: number | null) => ({
   duration_ms: t.duration_ms,
 });
 
-// now playing has to be live, so never cache this one
+// live, but every visitor within ~20s can share one answer instead of each hitting Spotify
 export const dynamic = "force-dynamic";
+const SHORT = { "Cache-Control": "public, s-maxage=20, stale-while-revalidate=60" };
 
 export async function GET() {
   const id = process.env.SPOTIFY_CLIENT_ID;
@@ -32,7 +33,7 @@ export async function GET() {
   const refresh = process.env.SPOTIFY_REFRESH_TOKEN;
 
   if (!id || !secret || !refresh) {
-    return NextResponse.json({ configured: false, track: null });
+    return NextResponse.json({ configured: false, track: null, problem: "Spotify keys are not set on this deployment" });
   }
 
   try {
@@ -40,6 +41,8 @@ export async function GET() {
     const headers = { Authorization: `Bearer ${token}` };
 
     const now = await fetch(NOW_URL, { headers, cache: "no-store" });
+    if (now.status === 401 || now.status === 403)
+      return NextResponse.json({ configured: true, track: null, problem: `Spotify refused (${now.status})` }, { headers: SHORT });
 
     // 204 = nothing playing right now
     if (now.status === 200) {
@@ -49,10 +52,10 @@ export async function GET() {
         item: Track | null;
       };
       if (json.item) {
-        return NextResponse.json({
-          configured: true,
-          track: shape(json.item, json.is_playing, json.progress_ms),
-        });
+        return NextResponse.json(
+          { configured: true, track: shape(json.item, json.is_playing, json.progress_ms) },
+          { headers: SHORT }
+        );
       }
     }
 
@@ -62,13 +65,13 @@ export async function GET() {
       const json = (await recent.json()) as { items?: { track: Track }[] };
       const last = json.items?.[0]?.track;
       if (last) {
-        return NextResponse.json({ configured: true, track: shape(last, false, null) });
+        return NextResponse.json({ configured: true, track: shape(last, false, null) }, { headers: SHORT });
       }
     }
 
-    return NextResponse.json({ configured: true, track: null });
+    return NextResponse.json({ configured: true, track: null }, { headers: SHORT });
   } catch (err) {
     console.error("[spotify now]", err);
-    return NextResponse.json({ configured: true, track: null, error: true });
+    return NextResponse.json({ configured: true, track: null, problem: (err as Error).message }, { headers: SHORT });
   }
 }
