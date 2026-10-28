@@ -182,7 +182,8 @@ export function drawTop(
   selected: number,
   now: Date,
   greeting: string,
-  caret: boolean
+  caret: boolean,
+  face: HTMLImageElement | null
 ) {
   const g = ctx.createLinearGradient(0, 0, 0, TOP_H);
   g.addColorStop(0, "#ffffff");
@@ -209,54 +210,76 @@ export function drawTop(
   const item = selected >= 0 ? menu[selected] : null;
 
   if (!item) {
-    // home: the typed greeting
+    // home: my face first, the greeting typing beside it
+    const size = 560;
+    const fy = 180;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(X, fy, size, size, 48);
+    ctx.clip();
+    if (face) {
+      const s = Math.min(face.width, face.height);
+      ctx.drawImage(face, (face.width - s) / 2, (face.height - s) / 2, s, s, X, fy, size, size);
+    } else {
+      ctx.fillStyle = "#e4e4e7";
+      ctx.fillRect(X, fy, size, size);
+    }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(0,0,0,0.08)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(X, fy, size, size, 48);
+    ctx.stroke();
+
+    const tx = X + size + 72;
     ctx.fillStyle = INK;
-    ctx.font = `700 168px ${FONT}`;
-    ctx.fillText(greeting, X, 390);
+    ctx.font = `700 118px ${FONT}`;
+    ctx.fillText(greeting, tx, 400);
     if (caret) {
-      const x = X + ctx.measureText(greeting).width + 14;
+      const x = tx + ctx.measureText(greeting).width + 12;
       ctx.fillStyle = GREEN;
-      ctx.fillRect(x, 318, 13, 146);
+      ctx.fillRect(x, 350, 11, 102);
     }
     ctx.fillStyle = "#71717a";
-    ctx.font = `500 52px ${FONT}`;
-    ctx.fillText("Stanford CS. Infrastructure and security.", X, 530);
+    ctx.font = `500 44px ${FONT}`;
+    ctx.fillText("Stanford CS.", tx, 506);
+    ctx.fillText("Infrastructure and security.", tx, 562);
     ctx.fillStyle = "#a1a1aa";
-    ctx.font = `500 38px ${FONT}`;
-    ctx.fillText("Pick a section on the bottom screen.", X, 760);
+    ctx.font = `500 34px ${FONT}`;
+    ctx.fillText("Use the d-pad or tap a tile below.", tx, 700);
     return;
   }
 
-  // section preview: title and blurb left, rows right
-  const split = 640;
+  // section preview: title and blurb on top, full-width rows below
   ctx.fillStyle = GREEN;
   ctx.font = `600 32px ${FONT}`;
-  ctx.fillText(`${String(selected + 1).padStart(2, "0")} / ${String(menu.length).padStart(2, "0")}`, X, 210);
+  ctx.fillText(`${String(selected + 1).padStart(2, "0")} / ${String(menu.length).padStart(2, "0")}`, X, 196);
   ctx.fillStyle = INK;
-  ctx.font = `700 112px ${FONT}`;
-  ctx.fillText(item.label, X, 320);
+  ctx.font = `700 100px ${FONT}`;
+  ctx.fillText(item.label, X, 282);
+  const tw = ctx.measureText(item.label).width;
   ctx.fillStyle = "#71717a";
   ctx.font = `500 44px ${FONT}`;
-  ctx.fillText(fit(ctx, item.blurb, split - X - 40), X, 420);
+  ctx.fillText(fit(ctx, item.blurb, TOP_W - X * 2 - tw - 40), X + tw + 36, 292);
 
-  const rx = split + 40;
-  const rw = TOP_W - X - rx;
+  const top = 392;
+  const step = item.rows.length > 3 ? 82 : 100;
   item.rows.forEach(([primary, secondary], i) => {
-    const y = 214 + i * 118;
+    const y = top + i * step;
     ctx.fillStyle = "rgba(0,0,0,0.06)";
-    ctx.fillRect(rx, y + 56, rw, 2);
+    ctx.fillRect(X, y - step / 2, TOP_W - X * 2, 2);
     ctx.font = `500 34px ${FONT}`;
-    const sw = secondary ? ctx.measureText(secondary).width + 32 : 0;
+    const sw = secondary ? ctx.measureText(secondary).width + 48 : 0;
     ctx.fillStyle = "#a1a1aa";
     ctx.textAlign = "right";
     if (secondary) ctx.fillText(secondary, TOP_W - X, y);
     ctx.textAlign = "left";
     ctx.fillStyle = INK;
     ctx.font = `600 42px ${FONT}`;
-    ctx.fillText(fit(ctx, primary, rw - sw), rx, y);
+    ctx.fillText(fit(ctx, primary, TOP_W - X * 2 - sw), X, y);
   });
 
   ctx.fillStyle = FOREST;
-  ctx.font = `600 38px ${FONT}`;
-  ctx.fillText("Tap again, or press A, to open", X, 760);
+  ctx.font = `600 36px ${FONT}`;
+  ctx.fillText("Tap again or press A to open.  B to go back.", X, 790);
 }

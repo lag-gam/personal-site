@@ -102,24 +102,37 @@ function Device({
     return () => clearInterval(id);
   }, [typed]);
 
+  const [face, setFace] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setFace(img);
+    img.src = "/headshot.jpg";
+  }, []);
+
   const topTex = useScreenTexture(
     TOP_W,
     TOP_H,
-    (ctx) => drawTop(ctx, sel, now, GREETING.slice(0, typed), typed < GREETING.length || blink),
-    [sel, now, typed, blink]
+    (ctx) => drawTop(ctx, sel, now, GREETING.slice(0, typed), typed < GREETING.length || blink, face),
+    [sel, now, typed, blink, face]
   );
   const botTex = useScreenTexture(SCREEN_W, SCREEN_H, (ctx) => drawBottom(ctx, sel), [sel]);
 
   // d-pad / arrow-key movement around the 3x2 grid
-  const move = (dx: number, dy: number) =>
+  const move = (dx: number, dy: number) => {
+    padPress.current = { dx, dz: dy, t: performance.now() };
     setSel((s) => {
       if (s < 0) return 0;
       const c = (s % GRID.cols + dx + GRID.cols) % GRID.cols;
       const r = (Math.floor(s / GRID.cols) + dy + GRID.rows) % GRID.rows;
       return r * GRID.cols + c;
     });
+  };
   const open = () => {
     if (live.current && selRef.current >= 0) onNavigate(menu[selRef.current].href);
+  };
+  const keyPress = (k: string) => {
+    if (k === "Enter" || k === "a" || k === "A") press(1);
+    if (k === "Escape" || k === "b" || k === "B") press(0);
   };
 
   // the canvas takes focus on click, then arrows move, Enter or A opens, Escape or B goes home
@@ -131,6 +144,7 @@ function Device({
     const onKey = (e: KeyboardEvent) => {
       if (!live.current) return;
       const k = e.key;
+      keyPress(k);
       if (k === "ArrowLeft") move(-1, 0);
       else if (k === "ArrowRight") move(1, 0);
       else if (k === "ArrowUp") move(0, -1);
@@ -188,10 +202,45 @@ function Device({
     look.lerpVectors(lookClosed, lookOpen, open);
     camera.lookAt(look);
 
+    // press feedback: pad tips toward the arm pressed, buttons sink
+    const t = performance.now();
+    const kp = Math.max(0, 1 - (t - padPress.current.t) / 180);
+    if (padRef.current) {
+      padRef.current.rotation.z = -padPress.current.dx * 0.14 * kp;
+      padRef.current.rotation.x = padPress.current.dz * 0.14 * kp;
+    }
+    btnRefs.current.forEach((g, k) => {
+      if (g) g.position.y = BASE_T - 0.014 * Math.max(0, 1 - (t - btnPress.current[k]) / 160);
+    });
+
     const c = 0.05 + 0.96 * power;
     topMat.current?.color.setScalar(c);
     botMat.current?.color.setScalar(c);
   });
+
+  const padRef = useRef<THREE.Group>(null);
+  const padPress = useRef({ dx: 0, dz: 0, t: -1e9 });
+  const btnRefs = useRef<(THREE.Group | null)[]>([]);
+  const btnPress = useRef<number[]>([-1e9, -1e9]);
+  const press = (k: number) => (btnPress.current[k] = performance.now());
+
+  const labels = useMemo(
+    () =>
+      ["B", "A"].map((ch) => {
+        const c = document.createElement("canvas");
+        c.width = c.height = 128;
+        const x = c.getContext("2d")!;
+        x.fillStyle = "rgba(255,255,255,0.85)";
+        x.font = `700 72px ui-sans-serif, -apple-system, "Inter", sans-serif`;
+        x.textAlign = "center";
+        x.textBaseline = "middle";
+        x.fillText(ch, 64, 70);
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }),
+    []
+  );
 
   const cursor = (on: boolean) => (gl.domElement.style.cursor = on ? "pointer" : "default");
 
@@ -214,7 +263,8 @@ function Device({
   const pad = (e: ThreeEvent<MouseEvent>) => {
     if (!live.current) return;
     e.stopPropagation();
-    const p = e.object.worldToLocal(e.point.clone());
+    if (!padRef.current) return;
+    const p = padRef.current.worldToLocal(e.point.clone());
     if (Math.abs(p.x) > Math.abs(p.z)) move(p.x > 0 ? 1 : -1, 0);
     else move(0, p.z > 0 ? 1 : -1);
   };
@@ -258,33 +308,46 @@ function Device({
         <meshBasicMaterial ref={botMat} map={botTex} toneMapped={false} />
       </mesh>
 
-      {/* controls: an original layout, round pad left, two keys right */}
-      <mesh position={[-1.07, BASE_T + 0.01, 0.05]} castShadow onClick={pad} {...hoverable}>
-        <cylinderGeometry args={[0.165, 0.165, 0.025, 48]} />
+      {/* controls: cross d-pad left, A and B right; all of them work */}
+      <mesh position={[-1.07, BASE_T + 0.003, 0.05]} receiveShadow>
+        <cylinderGeometry args={[0.19, 0.19, 0.006, 48]} />
         {inner}
       </mesh>
-      <mesh position={[-1.07, BASE_T + 0.028, 0.05]} castShadow>
-        <cylinderGeometry args={[0.06, 0.06, 0.015, 32]} />
-        {dark}
-      </mesh>
+      <group ref={padRef} position={[-1.07, BASE_T + 0.006, 0.05]} onClick={pad} {...hoverable}>
+        <RoundedBox args={[0.32, 0.035, 0.105]} radius={0.012} smoothness={3} position={[0, 0.0175, 0]} castShadow>
+          {dark}
+        </RoundedBox>
+        <RoundedBox args={[0.105, 0.035, 0.32]} radius={0.012} smoothness={3} position={[0, 0.0175, 0]} castShadow>
+          {dark}
+        </RoundedBox>
+      </group>
       {[
-        [0.99, -0.06],
-        [1.14, 0.14],
-      ].map(([x, z], k) => (
-        <mesh
-          key={`${x}`}
-          position={[x, BASE_T + 0.016, z]}
-          castShadow
+        { x: 0.98, z: 0.1, label: "B" },
+        { x: 1.15, z: -0.06, label: "A" },
+      ].map((btn, k) => (
+        <group
+          key={btn.label}
+          ref={(g) => {
+            btnRefs.current[k] = g;
+          }}
+          position={[btn.x, BASE_T, btn.z]}
           onClick={(e) => {
             e.stopPropagation();
-            if (k === 1) open(); // A: open
-            else setSel(-1); // B: home
+            press(k);
+            if (btn.label === "A") open();
+            else setSel(-1);
           }}
           {...hoverable}
         >
-          <cylinderGeometry args={[0.07, 0.07, 0.035, 40]} />
-          <meshPhysicalMaterial color={DARK} roughness={0.25} metalness={0.3} clearcoat={1} clearcoatRoughness={0.05} />
-        </mesh>
+          <mesh position={[0, 0.0175, 0]} castShadow>
+            <cylinderGeometry args={[0.072, 0.072, 0.035, 40]} />
+            <meshPhysicalMaterial color={DARK} roughness={0.25} metalness={0.3} clearcoat={1} clearcoatRoughness={0.05} />
+          </mesh>
+          <mesh position={[0, 0.0356, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.1, 0.1]} />
+            <meshBasicMaterial map={labels[k]} transparent toneMapped={false} />
+          </mesh>
+        </group>
       ))}
       <mesh position={[1.07, BASE_T + 0.008, 0.5]} rotation={[0, 0.2, 0]}>
         <boxGeometry args={[0.18, 0.012, 0.05]} />
