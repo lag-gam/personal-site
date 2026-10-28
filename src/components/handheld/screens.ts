@@ -632,11 +632,7 @@ function home(
     ctx.fillStyle = GREEN;
     ctx.fillRect(gx + 4 + ctx.measureText(tagline.text).width + 6, 666, 6, 50);
   }
-  ctx.fillStyle = FAINT;
-  ctx.textAlign = "center";
-  ctx.font = `500 30px ${FONT}`;
-  ctx.fillText("D-pad or arrow keys to move. A or Enter to open.", TOP_W / 2, 790);
-  ctx.textAlign = "left";
+
 }
 
 /** home, with a tile selected: just the app's name, and how to open it */
