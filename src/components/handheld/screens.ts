@@ -3,8 +3,8 @@ import { HOME_GRID, LIST_ROWS, THUMB_GRID, type App, type Glyph, type Item } fro
 export const SCREEN_W = 1024;
 export const SCREEN_H = 768;
 /* the top screen fills the whole lid, so it is wider than 4:3 */
-export const TOP_W = 1600;
-export const TOP_H = 866;
+export const TOP_W = 1152;
+export const TOP_H = 864; // 4:3, the same shape as the bottom screen
 
 /**
  * What the device is showing. app -1 is home. depth 1 is inside an item's children
@@ -14,6 +14,9 @@ export type View = { app: number; tile: number; item: number; depth: 0 | 1; sub:
 
 export type Media = HTMLImageElement | HTMLVideoElement;
 export type Img = (src: string | null | undefined) => HTMLImageElement | null;
+
+export type CamStatus = "off" | "starting" | "live" | "denied" | "unsupported";
+export type Cam = { video: HTMLVideoElement; status: CamStatus; flash: number };
 export type Vid = (src: string | null | undefined) => HTMLVideoElement | null;
 
 /** the list currently on screen: an app's items, or the children of the selected item */
@@ -34,7 +37,9 @@ const GREEN = "#008751";
 const INK = "#18181b";
 const MUTED = "#71717a";
 const FAINT = "#a1a1aa";
-const FONT = `ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+/** M PLUS 1p: a free Japanese gothic in the spirit of Fontworks Rodin */
+export const FONT_FAMILY = "M PLUS 1p";
+const FONT = `"${FONT_FAMILY}", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
 
 /* ---------- helpers ---------- */
 
@@ -131,6 +136,20 @@ function glyph(ctx: CanvasRenderingContext2D, g: Glyph, cx: number, cy: number, 
       ctx.beginPath();
       ctx.ellipse(-h * 0.5, h * 0.58, h * 0.28, h * 0.22, -0.3, 0, Math.PI * 2);
       ctx.ellipse(h * 0.45, h * 0.38, h * 0.28, h * 0.22, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case "image":
+      rr(ctx, -h, -h * 0.75, s, h * 1.5, s * 0.1);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-h * 0.8, h * 0.6);
+      ctx.lineTo(-h * 0.25, -h * 0.05);
+      ctx.lineTo(h * 0.15, h * 0.35);
+      ctx.lineTo(h * 0.4, h * 0.1);
+      ctx.lineTo(h * 0.8, h * 0.6);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(h * 0.45, -h * 0.35, h * 0.15, 0, Math.PI * 2);
       ctx.fill();
       break;
     case "camera":
@@ -264,7 +283,6 @@ function homeTile(i: number) {
   return { x: PAD_X + c * (w + GAP), y: top + r * (h + GAP), w, h };
 }
 
-const BACK = { x: 24, y: 20, w: 168, h: 58 };
 const ROW_TOP = HEAD + 12;
 const ROW_H = (SCREEN_H - ROW_TOP - 16) / LIST_ROWS;
 
@@ -282,38 +300,6 @@ function thumbRect(slot: number) {
 }
 
 const PER_PAGE = THUMB_GRID.cols * THUMB_GRID.rows;
-
-export type Hit = { kind: "tile"; i: number } | { kind: "row"; i: number } | { kind: "back" } | null;
-
-const inside = (x: number, y: number, r: { x: number; y: number; w: number; h: number }) =>
-  x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
-
-/** uv from a raycast (origin bottom-left) to what was touched */
-export function hitBottom(apps: App[], view: View, u: number, v: number): Hit {
-  const x = u * SCREEN_W;
-  const y = (1 - v) * SCREEN_H;
-  if (view.app < 0) {
-    for (let i = 0; i < apps.length; i++) if (inside(x, y, homeTile(i))) return { kind: "tile", i };
-    return null;
-  }
-  if (inside(x, y, BACK)) return { kind: "back" };
-  const lv = level(apps, view);
-  if (lv.kind === "grid") {
-    const page = Math.floor(lv.sel / PER_PAGE);
-    for (let s = 0; s < PER_PAGE; s++) {
-      const i = page * PER_PAGE + s;
-      if (i < lv.items.length && inside(x, y, thumbRect(s))) return { kind: "row", i };
-    }
-    return null;
-  }
-  const start = listStart(lv.items.length, lv.sel);
-  for (let k = 0; k < LIST_ROWS; k++) {
-    const i = start + k;
-    if (i >= lv.items.length) break;
-    if (y >= ROW_TOP + k * ROW_H && y < ROW_TOP + (k + 1) * ROW_H && x > 16 && x < SCREEN_W - 16) return { kind: "row", i };
-  }
-  return null;
-}
 
 /* ---------- bottom screen ---------- */
 
@@ -333,14 +319,22 @@ function header(ctx: CanvasRenderingContext2D, title: string, right: string) {
   ctx.fillStyle = "rgba(0,0,0,0.07)";
   ctx.fillRect(0, HEAD - 2, SCREEN_W, 2);
 
-  rr(ctx, BACK.x, BACK.y, BACK.w, BACK.h, 29);
-  ctx.fillStyle = "#f1f3f2";
-  ctx.fill();
-  ctx.fillStyle = INK;
-  ctx.font = `600 30px ${FONT}`;
+  // B hint where the back pill used to be; the screens are not touch targets
   ctx.textBaseline = "middle";
+  ctx.beginPath();
+  ctx.arc(52, HEAD / 2, 20, 0, Math.PI * 2);
+  ctx.fillStyle = "#3f3f46";
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `700 24px ${FONT}`;
   ctx.textAlign = "center";
-  ctx.fillText("‹  Back", BACK.x + BACK.w / 2, BACK.y + BACK.h / 2 + 1);
+  ctx.fillText("B", 52, HEAD / 2 + 1);
+  ctx.textAlign = "left";
+  ctx.fillStyle = MUTED;
+  ctx.font = `500 28px ${FONT}`;
+  ctx.fillText("Back", 84, HEAD / 2 + 1);
+  ctx.fillStyle = INK;
+  ctx.textAlign = "center";
   ctx.font = `700 36px ${FONT}`;
   ctx.fillText(title, SCREEN_W / 2, HEAD / 2);
   ctx.textAlign = "right";
@@ -350,7 +344,56 @@ function header(ctx: CanvasRenderingContext2D, title: string, right: string) {
   ctx.textAlign = "left";
 }
 
-export function drawBottom(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img) {
+export function drawBottom(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img, shots: HTMLCanvasElement[] = []) {
+  if (view.app >= 0 && apps[view.app]?.kind === "camera") {
+    background(ctx);
+    header(ctx, "Camera", shots.length ? `${shots.length} taken` : "");
+    // shutter
+    const cx = SCREEN_W / 2;
+    const cy = 300;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 118, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = "rgba(0,0,0,0.08)";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 92, 0, Math.PI * 2);
+    ctx.fillStyle = GREEN;
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `800 72px ${FONT}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("A", cx, cy + 4);
+    ctx.fillStyle = MUTED;
+    ctx.font = `600 32px ${FONT}`;
+    ctx.fillText("Take photo", cx, cy + 160);
+    ctx.textAlign = "left";
+    // the last few shots, this visit only
+    const tw = 200;
+    const th = 150;
+    const gap = 20;
+    const n = Math.max(shots.length, 1);
+    const total = 4 * tw + 3 * gap;
+    let x = (SCREEN_W - total) / 2;
+    for (let i = 0; i < 4; i++) {
+      const s = shots[i];
+      if (s) cover(ctx, s as unknown as HTMLImageElement, x, 560, tw, th, 14);
+      else {
+        rr(ctx, x, 560, tw, th, 14);
+        ctx.strokeStyle = "rgba(0,0,0,0.1)";
+        ctx.setLineDash([10, 8]);
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      x += tw + gap;
+    }
+    void n;
+    return;
+  }
   background(ctx);
   ctx.textBaseline = "middle";
 
@@ -553,38 +596,55 @@ function chips(ctx: CanvasRenderingContext2D, tags: string[], x0: number, y0: nu
   return y + 62;
 }
 
-function home(ctx: CanvasRenderingContext2D, greeting: string, caret: boolean, face: HTMLImageElement | null) {
-  const size = 560;
-  const fy = 168;
-  if (face) cover(ctx, face, X, fy, size, size, 48);
-  else placeholder(ctx, X, fy, size, size, 48);
-  rr(ctx, X, fy, size, size, 48);
+function home(
+  ctx: CanvasRenderingContext2D,
+  greeting: string,
+  caret: boolean,
+  face: HTMLImageElement | null,
+  tagline: { text: string; caret: boolean }
+) {
+  // 4:3 screen: face centered on top, greeting typing underneath
+  const size = 330;
+  const fx = (TOP_W - size) / 2;
+  const fy = 150;
+  if (face) cover(ctx, face, fx, fy, size, size, 40);
+  else placeholder(ctx, fx, fy, size, size, 40);
+  rr(ctx, fx, fy, size, size, 40);
   ctx.strokeStyle = "rgba(0,0,0,0.08)";
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  const tx = X + size + 72;
   ctx.fillStyle = INK;
-  ctx.font = `700 118px ${FONT}`;
-  ctx.fillText(greeting, tx, 390);
+  ctx.font = `700 112px ${FONT}`;
+  const full = ctx.measureText("Hi, I\u2019m Agam").width;
+  const gx = (TOP_W - full) / 2; // anchor at the finished width so it doesn't slide while typing
+  ctx.fillText(greeting, gx, 590);
   if (caret) {
-    const x = tx + ctx.measureText(greeting).width + 12;
+    const x = gx + ctx.measureText(greeting).width + 10;
     ctx.fillStyle = GREEN;
-    ctx.fillRect(x, 340, 11, 102);
+    ctx.fillRect(x, 545, 10, 92);
   }
+  // tagline types in under the greeting, left-aligned with it so it grows rightward
   ctx.fillStyle = MUTED;
   ctx.font = `500 44px ${FONT}`;
-  ctx.fillText("Stanford CS.", tx, 496);
-  ctx.fillText("Infrastructure and security.", tx, 552);
+  ctx.fillText(tagline.text, gx + 4, 690);
+  if (tagline.caret) {
+    ctx.fillStyle = GREEN;
+    ctx.fillRect(gx + 4 + ctx.measureText(tagline.text).width + 6, 666, 6, 50);
+  }
   ctx.fillStyle = FAINT;
-  ctx.font = `500 32px ${FONT}`;
-  ctx.fillText("Use the d-pad, or tap a tile below.", tx, 690);
+  ctx.textAlign = "center";
+  ctx.font = `500 30px ${FONT}`;
+  ctx.fillText("D-pad or arrow keys to move. A or Enter to open.", TOP_W / 2, 790);
+  ctx.textAlign = "left";
 }
 
 /** home, with a tile selected: just the app's name, and how to open it */
 function preview(ctx: CanvasRenderingContext2D, app: App) {
   ctx.fillStyle = INK;
-  ctx.font = `700 168px ${FONT}`;
+  let px = 168;
+  ctx.font = `700 ${px}px ${FONT}`;
+  while (px > 72 && ctx.measureText(app.label).width > TOP_W - X * 2) ctx.font = `700 ${(px -= 8)}px ${FONT}`;
   ctx.textAlign = "center";
   ctx.fillText(app.label, TOP_W / 2, 430);
   ctx.textAlign = "left";
@@ -617,10 +677,10 @@ function detail(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img
   let tx = X;
   const pic = img(it.image);
   if (it.image) {
-    const sz = 360;
-    if (pic) cover(ctx, pic, X, 160, sz, sz, 32, lv.app.id === "experience");
-    else placeholder(ctx, X, 160, sz, sz, 32);
-    tx = X + sz + 64;
+    const sz = 230;
+    if (pic) cover(ctx, pic, X, 160, sz, sz, 28, lv.app.id === "experience");
+    else placeholder(ctx, X, 160, sz, sz, 28);
+    tx = X + sz + 48;
   }
   const maxW = TOP_W - X - tx;
 
@@ -632,7 +692,9 @@ function detail(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img
     y += 70;
   } else y += 30;
   ctx.fillStyle = INK;
-  ctx.font = `700 76px ${FONT}`;
+  let tpx = 72;
+  ctx.font = `700 ${tpx}px ${FONT}`;
+  while (tpx > 44 && ctx.measureText(it.title).width > maxW) ctx.font = `700 ${(tpx -= 4)}px ${FONT}`;
   ctx.fillText(fit(ctx, it.title, maxW), tx, y);
   y += 72;
   if (it.subtitle) {
@@ -696,17 +758,133 @@ export function drawTop(
   face: HTMLImageElement | null,
   img: Img,
   vid: Vid,
-  muted: boolean
+  muted: boolean,
+  cam?: Cam,
+  tagline: { text: string; caret: boolean } = { text: "", caret: false }
 ): number {
+  if (view.app >= 0 && apps[view.app]?.kind === "camera") {
+    drawCamera(ctx, cam);
+    return 1;
+  }
   if (view.app < 0) {
     const app = view.tile >= 0 ? apps[view.tile] : null;
     status(ctx, "Agam Iheanyi-Igwe", now);
     if (app) preview(ctx, app);
-    else home(ctx, greeting, caret, face);
+    else home(ctx, greeting, caret, face, tagline);
     return 1;
   }
   const app = apps[view.app];
   if (app.kind === "grid") return detail(ctx, apps, view, img, vid, muted);
   status(ctx, view.depth ? `${app.label}  \u203A  ${apps[view.app].items[view.item]?.title ?? ""}` : app.label, now);
   return detail(ctx, apps, view, img, vid, muted);
+}
+
+/* ---------- camera ---------- */
+
+/*
+  A low-resolution buffer is the whole trick: the webcam is drawn small, roughed up per pixel
+  (lifted blacks, softer contrast, warm cast, a little desaturation, fresh grain every frame),
+  then stretched back up with smoothing on. That gives the soft, noisy look of a handheld camera.
+*/
+const CAM_W = 256;
+const CAM_H = 192;
+let camBuf: HTMLCanvasElement | null = null;
+
+export function cameraFrame() {
+  if (!camBuf) {
+    camBuf = document.createElement("canvas");
+    camBuf.width = CAM_W;
+    camBuf.height = CAM_H;
+  }
+  return camBuf;
+}
+
+function message(ctx: CanvasRenderingContext2D, title: string, body: string) {
+  ctx.fillStyle = "#101112";
+  ctx.fillRect(0, 0, TOP_W, TOP_H);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `700 56px ${FONT}`;
+  ctx.fillText(title, TOP_W / 2, TOP_H / 2 - 40);
+  ctx.fillStyle = "#a1a1aa";
+  ctx.font = `500 32px ${FONT}`;
+  wrap(ctx, body, TOP_W - 240).forEach((l, i) => ctx.fillText(l, TOP_W / 2, TOP_H / 2 + 40 + i * 44));
+  ctx.textAlign = "left";
+}
+
+export function drawCamera(ctx: CanvasRenderingContext2D, cam?: Cam) {
+  if (!cam || cam.status === "off" || cam.status === "starting")
+    return message(ctx, "Starting camera\u2026", "Your browser may ask for permission. Nothing leaves your device.");
+  if (cam.status === "denied")
+    return message(ctx, "Camera blocked", "Allow camera access for this site in your browser settings, then reopen the app.");
+  if (cam.status === "unsupported") return message(ctx, "No camera here", "This browser can't share a camera with web pages.");
+
+  const v = cam.video;
+  const buf = cameraFrame();
+  const b = buf.getContext("2d", { willReadFrequently: true })!;
+  // mirror, crop to 4:3
+  const vw = v.videoWidth || 640;
+  const vh = v.videoHeight || 480;
+  const s = Math.max(CAM_W / vw, CAM_H / vh);
+  b.save();
+  b.translate(CAM_W, 0);
+  b.scale(-1, 1);
+  b.drawImage(v, (CAM_W - vw * s) / 2, (CAM_H - vh * s) / 2, vw * s, vh * s);
+  b.restore();
+
+  const im = b.getImageData(0, 0, CAM_W, CAM_H);
+  const d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i];
+    let g = d[i + 1];
+    let bl = d[i + 2];
+    const l = 0.3 * r + 0.59 * g + 0.11 * bl;
+    r = l + (r - l) * 0.8; // a little desaturated
+    g = l + (g - l) * 0.8;
+    bl = l + (bl - l) * 0.8;
+    r = 18 + r * 0.86 + 8; // lifted blacks, softer contrast, warm
+    g = 18 + g * 0.86 + 2;
+    bl = 18 + bl * 0.86 - 6;
+    const n = (Math.random() - 0.5) * 34; // grain
+    d[i] = r + n;
+    d[i + 1] = g + n;
+    d[i + 2] = bl + n;
+  }
+  b.putImageData(im, 0, 0);
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "low";
+  ctx.drawImage(buf, 0, 0, TOP_W, TOP_H);
+
+  // vignette
+  const vg = ctx.createRadialGradient(TOP_W / 2, TOP_H / 2, TOP_H * 0.35, TOP_W / 2, TOP_H / 2, TOP_W * 0.72);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(0,0,0,0.45)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, TOP_W, TOP_H);
+
+  // shutter flash
+  if (cam.flash < 350) {
+    ctx.fillStyle = `rgba(255,255,255,${1 - cam.flash / 350})`;
+    ctx.fillRect(0, 0, TOP_W, TOP_H);
+  }
+
+  // corner brackets, like a viewfinder
+  ctx.strokeStyle = "rgba(255,255,255,0.75)";
+  ctx.lineWidth = 6;
+  const m = 56;
+  const L = 60;
+  for (const [x, y, dx, dy] of [
+    [m, m, 1, 1],
+    [TOP_W - m, m, -1, 1],
+    [m, TOP_H - m, 1, -1],
+    [TOP_W - m, TOP_H - m, -1, -1],
+  ]) {
+    ctx.beginPath();
+    ctx.moveTo(x, y + dy * L);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + dx * L, y);
+    ctx.stroke();
+  }
 }

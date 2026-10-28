@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useMotionValue, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { buildApps, type App, type GalleryPhoto, type NowPlaying, type Playlist } from "./apps";
+import { Controls } from "./Controls";
 
 const Scene = dynamic(() => import("./Scene"), { ssr: false });
 
@@ -22,7 +23,7 @@ function PlainSite({ apps, visible }: { apps: App[]; visible: boolean }) {
   return (
     <div className={visible ? "mx-auto max-w-3xl px-5 py-20 text-zinc-300" : "sr-only"}>
       <h1 className="text-4xl font-semibold text-white">Agam Iheanyi-Igwe</h1>
-      {apps.map((app) => (
+      {apps.filter((a) => a.kind !== "camera").map((app) => (
         <section key={app.id} className="mt-12">
           <h2 className="text-2xl font-semibold text-white">
             {app.kind === "link" && app.href ? (
@@ -102,9 +103,16 @@ export function HandheldSection({ creative }: { creative: GalleryPhoto[] }) {
   const introOpacity = useTransform(scrollYProgress, (v) => 1 - Math.min(1, v / 0.08));
   const introY = useTransform(scrollYProgress, [0, 0.1], [0, 12]);
 
+  // new tab when the browser allows it; if a popup blocker eats it, go there in this tab
   const open = useCallback((href: string) => {
-    if (href.startsWith("mailto:")) window.location.href = href;
-    else window.open(href, "_blank", "noopener,noreferrer");
+    if (href.startsWith("mailto:")) {
+      window.location.href = href;
+      return;
+    }
+    const url = new URL(href, window.location.href).toString();
+    const tab = window.open(url, "_blank");
+    if (tab) tab.opener = null;
+    else window.location.assign(url);
   }, []);
 
   if (gl === false) return <PlainSite apps={apps} visible />;
@@ -120,6 +128,7 @@ export function HandheldSection({ creative }: { creative: GalleryPhoto[] }) {
           <span className="h-8 w-px animate-pulse bg-zinc-600" />
         </motion.div>
 
+        <Controls />
         <div className="absolute inset-0">{gl && <Scene progress={progress} apps={apps} onOpen={open} reduced={!!reduced} />}</div>
       </div>
       <PlainSite apps={apps} visible={false} />

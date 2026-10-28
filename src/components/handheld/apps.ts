@@ -1,6 +1,6 @@
 import { interests, involvements, projects, roles, site } from "@/data/site";
 
-export type Glyph = "briefcase" | "code" | "music" | "camera" | "chip" | "person" | "mail" | "doc";
+export type Glyph = "briefcase" | "code" | "music" | "camera" | "image" | "chip" | "person" | "mail" | "doc";
 
 /** One row in an app's list (bottom screen) and its detail page (top screen). */
 export type Item = {
@@ -30,8 +30,8 @@ export type App = {
   label: string;
   blurb: string;
   glyph: Glyph;
-  /** list = rows; grid = photo thumbnails; link = the tile itself opens href */
-  kind: "list" | "grid" | "link";
+  /** list = rows; grid = photo thumbnails; link = the tile itself opens href; camera = live webcam */
+  kind: "list" | "grid" | "link" | "camera";
   href?: string;
   items: Item[];
   empty?: string;
@@ -147,7 +147,7 @@ export function buildApps(data: {
       id: "creative",
       label: "Creative",
       blurb: "Creative Works. Photos and films.",
-      glyph: "camera",
+      glyph: "image",
       kind: "grid",
       items: data.creative.map(photo),
       empty: "No photos yet. Add them to /public/gallery/creative.",
@@ -199,6 +199,14 @@ export function buildApps(data: {
       glyph: "doc",
       kind: "link",
       href: site.resume,
+      items: [],
+    },
+    {
+      id: "camera",
+      label: "Camera",
+      blurb: "Say cheese.",
+      glyph: "camera",
+      kind: "camera",
       items: [],
     },
   ];

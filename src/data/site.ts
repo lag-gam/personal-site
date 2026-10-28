@@ -228,3 +228,12 @@ export const playlists = [
   { id: "52VlLSTlwQCBA4KMAeqHje" },
   { id: "2D8b2zB97zN8FtAZKy7adg" },
 ];
+
+/** Typed under the greeting, one at a time, in a loop. Edit freely. */
+export const taglines = [
+  "CS @ Stanford",
+  "Videographer",
+  "Underground Enthusiast",
+  "Anime Lover",
+  "Interested in Deep Learning",
+];

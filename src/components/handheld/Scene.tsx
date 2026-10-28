@@ -7,7 +7,8 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { MotionValue } from "motion/react";
 import { HOME_GRID, THUMB_GRID, type App } from "./apps";
-import { SCREEN_H, SCREEN_W, TOP_H, TOP_W, drawBottom, drawTop, hitBottom, level, type View } from "./screens";
+import { taglines } from "@/data/site";
+import { FONT_FAMILY, SCREEN_H, SCREEN_W, TOP_H, TOP_W, cameraFrame, drawBottom, drawTop, level, type CamStatus, type View } from "./screens";
 
 /*
   An original dual-screen clamshell, and the whole site lives on it.
@@ -114,6 +115,43 @@ function useImages() {
   return { img, version };
 }
 
+/** the computer's camera, only while the Camera app is open; stopped the moment you leave */
+function useCamera(active: boolean) {
+  const [status, setStatus] = useState<CamStatus>("off");
+  const video = useMemo(() => {
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    return v;
+  }, []);
+  useEffect(() => {
+    if (!active) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatus("unsupported");
+      return;
+    }
+    let alive = true;
+    let stream: MediaStream | null = null;
+    setStatus("starting");
+    navigator.mediaDevices
+      .getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false })
+      .then((s) => {
+        if (!alive) return s.getTracks().forEach((t) => t.stop());
+        stream = s;
+        video.srcObject = s;
+        return video.play().then(() => alive && setStatus("live"));
+      })
+      .catch(() => alive && setStatus("denied"));
+    return () => {
+      alive = false;
+      stream?.getTracks().forEach((t) => t.stop());
+      video.srcObject = null;
+      setStatus("off");
+    };
+  }, [active, video]);
+  return { video, status };
+}
+
 const GREETING = "Hi, I’m Agam";
 
 function useCross() {
@@ -175,6 +213,23 @@ function Device({
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
   const pagesRef = useRef(1);
+
+  const camOn = view.app >= 0 && apps[view.app]?.kind === "camera";
+  const cam = useCamera(camOn);
+  const camRef = useRef(cam);
+  camRef.current = cam;
+  const flashAt = useRef(-1e9);
+  const [shots, setShots] = useState<HTMLCanvasElement[]>([]);
+  const snap = () => {
+    if (camRef.current.status !== "live") return;
+    const src = cameraFrame();
+    const c = document.createElement("canvas");
+    c.width = src.width;
+    c.height = src.height;
+    c.getContext("2d")!.drawImage(src, 0, 0);
+    flashAt.current = performance.now();
+    setShots((s) => [c, ...s].slice(0, 4));
+  };
   const viewRef = useRef(view);
   viewRef.current = view;
   const appsRef = useRef(apps);
@@ -195,6 +250,30 @@ function Device({
     const id = setTimeout(() => setTyped((t) => t + 1), typed === 0 ? 350 : 95);
     return () => clearTimeout(id);
   }, [typed, started]);
+  // under the greeting: type a tagline, hold, backspace, next one, forever (only while the greeting is showing)
+  const onGreeting = view.app < 0 && view.tile < 0;
+  const greetingDone = typed >= GREETING.length;
+  const [tag, setTag] = useState({ i: 0, n: reduced ? taglines[0].length : 0, del: false });
+  useEffect(() => {
+    if (!onGreeting || !greetingDone || !taglines.length) return;
+    const word = taglines[tag.i % taglines.length];
+    let delay: number;
+    let next: typeof tag;
+    if (reduced) {
+      delay = 2600;
+      const i = (tag.i + 1) % taglines.length;
+      next = { i, n: taglines[i].length, del: false };
+    } else if (!tag.del) {
+      if (tag.n < word.length) [delay, next] = [65 + Math.random() * 50, { ...tag, n: tag.n + 1 }];
+      else [delay, next] = [1700, { ...tag, del: true }];
+    } else if (tag.n > 0) [delay, next] = [32, { ...tag, n: tag.n - 1 }];
+    else [delay, next] = [320, { i: (tag.i + 1) % taglines.length, n: 0, del: false }];
+    const id = setTimeout(() => setTag(next), delay);
+    return () => clearTimeout(id);
+  }, [tag, onGreeting, greetingDone, reduced]);
+  const tagText = taglines.length ? taglines[tag.i % taglines.length].slice(0, tag.n) : "";
+  const tagHolding = !tag.del && tag.n === (taglines[tag.i % taglines.length]?.length ?? 0);
+
   const [blink, setBlink] = useState(true);
   useEffect(() => {
     if (typed < GREETING.length) return;
@@ -204,15 +283,37 @@ function Device({
 
   const face = img("/headshot.jpg");
 
+  // canvas text only uses a web font once it has loaded, so load every weight we draw with, then redraw
+  const [fontsReady, setFontsReady] = useState(0);
+  useEffect(() => {
+    if (!document.fonts) return;
+    Promise.all(["400", "500", "700", "800"].map((w) => document.fonts.load(`${w} 40px "${FONT_FAMILY}"`)))
+      .then(() => setFontsReady((n) => n + 1))
+      .catch(() => {});
+  }, []);
+
   const top = useScreenTexture(
     TOP_W,
     TOP_H,
     (ctx) => {
-      pagesRef.current = drawTop(ctx, apps, view, now, GREETING.slice(0, typed), typed < GREETING.length || blink, face, img, vid, muted);
+      pagesRef.current = drawTop(
+        ctx,
+        apps,
+        view,
+        now,
+        GREETING.slice(0, typed),
+        !greetingDone,
+        face,
+        img,
+        vid,
+        muted,
+        { video: cam.video, status: cam.status, flash: performance.now() - flashAt.current },
+        { text: tagText, caret: greetingDone && (!tagHolding || blink) }
+      );
     },
-    [apps, view, now, typed, blink, version, muted]
+    [apps, view, now, typed, blink, version, muted, fontsReady, cam.status, tagText, tagHolding]
   );
-  const bottom = useScreenTexture(SCREEN_W, SCREEN_H, (ctx) => drawBottom(ctx, apps, view, img), [apps, view, version]);
+  const bottom = useScreenTexture(SCREEN_W, SCREEN_H, (ctx) => drawBottom(ctx, apps, view, img, shots), [apps, view, version, fontsReady, shots]);
   const topTex = top.texture;
   const botTex = bottom.texture;
 
@@ -270,6 +371,7 @@ function Device({
       else setView({ ...v, tile: 0 });
       return;
     }
+    if (appsRef.current[v.app]?.kind === "camera") return snap();
     const lv = level(appsRef.current, v);
     const it = lv.items[lv.sel];
     if (!it) return;
@@ -306,37 +408,10 @@ function Device({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const cursor = (on: boolean) => (gl.domElement.style.cursor = on ? "pointer" : "default");
+  const cursor = (on: boolean) => (gl.domElement.style.cursor = on ? "pointer" : "grab");
 
-  // mouse hover highlights; a tap on the highlighted thing opens it, so touch is tap to pick, tap to open
-  const hover = (e: ThreeEvent<PointerEvent>) => {
-    if (!live.current || !e.uv || e.pointerType !== "mouse") return;
-    const h = hitBottom(appsRef.current, viewRef.current, e.uv.x, e.uv.y);
-    cursor(!!h);
-    if (h?.kind === "tile") setView((v) => (v.tile === h.i ? v : { ...v, tile: h.i }));
-    if (h?.kind === "row")
-      setView((v) => {
-        const sel = v.depth ? v.sub : v.item;
-        if (sel === h.i) return v;
-        return v.depth ? { ...v, sub: h.i, page: 0 } : { ...v, item: h.i, page: 0 };
-      });
-  };
-  const tap = (e: ThreeEvent<MouseEvent>) => {
-    if (!live.current || !e.uv) return;
-    e.stopPropagation();
-    const v = viewRef.current;
-    const h = hitBottom(appsRef.current, v, e.uv.x, e.uv.y);
-    if (!h) return;
-    if (h.kind === "back") return back();
-    if (h.kind === "tile") return v.tile === h.i ? enter(h.i) : setView({ ...v, tile: h.i });
-    if (h.kind === "row") {
-      const sel = v.depth ? v.sub : v.item;
-      if (sel === h.i) activate();
-      else setView(v.depth ? { ...v, sub: h.i, page: 0 } : { ...v, item: h.i, page: 0 });
-    }
-  };
   const pad = (e: ThreeEvent<MouseEvent>) => {
-    if (!live.current || !padRef.current) return;
+    if (!live.current || !padRef.current || e.delta > 6) return; // a drag that started here rotates, not presses
     e.stopPropagation();
     const p = padRef.current.worldToLocal(e.point.clone());
     if (Math.abs(p.x) > Math.abs(p.z)) move(p.x > 0 ? 1 : -1, 0);
@@ -422,7 +497,7 @@ function Device({
       if (g) g.position.y = BASE_T - 0.014 * Math.max(0, 1 - (t - btnPress.current[k]) / 160);
     });
 
-    if (activeVideo && t - lastFrame.current > 33) {
+    if ((activeVideo || camRef.current.status === "live") && t - lastFrame.current > 33) {
       lastFrame.current = t;
       top.redraw();
     }
@@ -454,9 +529,6 @@ function Device({
       <mesh
         position={[0, BASE_T + 0.0115, 0.02]}
         rotation={[-Math.PI / 2, 0, 0]}
-        onPointerMove={hover}
-        onPointerOut={() => cursor(false)}
-        onClick={tap}
       >
         <planeGeometry args={[1.52, 1.14]} />
         <meshBasicMaterial ref={botMat} map={botTex} toneMapped={false} />
@@ -486,6 +558,7 @@ function Device({
           position={[btn.x, BASE_T, btn.z]}
           onClick={(e) => {
             e.stopPropagation();
+            if (e.delta > 6) return;
             press(k);
             if (btn.label === "A") activate();
             else back();
@@ -507,11 +580,38 @@ function Device({
         {dark}
       </mesh>
 
-      {/* hinge barrel */}
+      {/* hinge barrel, with the camera, mic and status lights set into its face */}
       <mesh position={[0, BASE_T + 0.035, -D / 2 + 0.02]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
         <cylinderGeometry args={[0.085, 0.085, W - 0.5, 40]} />
         {shell}
       </mesh>
+      <group position={[0, BASE_T + 0.035, -D / 2 + 0.02]} rotation={[-0.55, 0, 0]}>
+        <mesh position={[0, 0, 0.082]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.036, 0.036, 0.014, 40]} />
+          <meshPhysicalMaterial color="#0d0e0f" roughness={0.35} clearcoat={0.6} />
+        </mesh>
+        <mesh position={[0, 0, 0.09]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.021, 0.021, 0.006, 40]} />
+          <meshPhysicalMaterial color="#03040a" roughness={0.04} metalness={0.3} clearcoat={1} clearcoatRoughness={0} envMapIntensity={2} />
+        </mesh>
+        {/* camera light: green while the camera is in use */}
+        <mesh position={[0.075, 0, 0.084]}>
+          <sphereGeometry args={[0.007, 16, 16]} />
+          <meshBasicMaterial color={cam.status === "live" ? "#3dff8a" : "#1a1c1b"} toneMapped={false} />
+        </mesh>
+        {/* mic */}
+        <mesh position={[0.17, 0, 0.084]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.006, 0.006, 0.004, 16]} />
+          <meshBasicMaterial color="#050505" />
+        </mesh>
+        {/* status lights */}
+        {(["#ffd23d", "#3db8ff", "#3db8ff"] as const).map((c, i) => (
+          <mesh key={i} position={[-0.86 + i * 0.05, 0, 0.083]} rotation={[Math.PI / 2, 0, 0]}>
+            <boxGeometry args={[0.02, 0.006, 0.026]} />
+            <meshBasicMaterial color={c} toneMapped={false} />
+          </mesh>
+        ))}
+      </group>
 
       {/* lid: pivots on the hinge line */}
       <group ref={lid} position={[0, BASE_T + 0.045, -D / 2]}>
@@ -523,17 +623,82 @@ function Device({
           <cylinderGeometry args={[0.07, 0.07, 0.006, 48]} />
           <meshPhysicalMaterial color="#1a1b1d" roughness={0.42} metalness={0} clearcoat={0.25} clearcoatRoughness={0.5} />
         </mesh>
-        {/* inner face: bezel and an edge-to-edge top screen */}
-        <RoundedBox args={[W - 0.12, 0.01, D - 0.12]} radius={0.004} smoothness={2} position={[0, -0.003, D / 2]}>
+        {/* inner face: a screen the same size as the bottom one, red side bezels with speakers */}
+        <RoundedBox args={[1.64, 0.01, 1.25]} radius={0.005} smoothness={2} position={[0, -0.003, D / 2]}>
           {inner}
         </RoundedBox>
         <mesh position={[0, -0.0095, D / 2]} rotation={[Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[2.4, 1.3]} />
+          <planeGeometry args={[1.52, 1.14]} />
           <meshBasicMaterial ref={topMat} map={topTex} toneMapped={false} />
         </mesh>
+        {[-1, 1].map((sx) => (
+          <RoundedBox key={sx} args={[0.13, 0.006, 0.026]} radius={0.012} smoothness={3} position={[sx * 1.06, -0.001, D / 2]}>
+            <meshPhysicalMaterial color="#141516" roughness={0.6} />
+          </RoundedBox>
+        ))}
       </group>
     </group>
   );
+}
+
+/*
+  Drag (mouse, trackpad click, or one finger) to rotate; a sideways two-finger swipe spins it.
+  Vertical scrolling is left alone, so it still opens and flattens the device. Double-click resets.
+*/
+function Spin({ children }: { children: React.ReactNode }) {
+  const g = useRef<THREE.Group>(null);
+  const target = useRef({ yaw: 0, pitch: 0 });
+  const { gl } = useThree();
+  useEffect(() => {
+    const el = gl.domElement;
+    el.style.touchAction = "pan-y"; // the browser keeps vertical touch scrolling
+    el.style.cursor = "grab";
+    let drag: { id: number; x: number; y: number } | null = null;
+    const down = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    };
+    const move = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+      target.current.yaw += dx * 0.005;
+      if (e.pointerType !== "touch") target.current.pitch = clamp(target.current.pitch + dy * 0.004, -0.7, 0.7);
+      if (Math.abs(dx) + Math.abs(dy) > 0) el.style.cursor = "grabbing";
+    };
+    const up = (e: PointerEvent) => {
+      if (drag && e.pointerId === drag.id) drag = null;
+      if (el.style.cursor === "grabbing") el.style.cursor = "grab";
+    };
+    const wheel = (e: WheelEvent) => {
+      if (e.ctrlKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY) * 1.2) return; // vertical: let the page scroll
+      e.preventDefault();
+      target.current.yaw -= e.deltaX * 0.003;
+    };
+    const reset = () => (target.current = { yaw: 0, pitch: 0 });
+    el.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    el.addEventListener("wheel", wheel, { passive: false });
+    el.addEventListener("dblclick", reset);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      el.removeEventListener("wheel", wheel);
+      el.removeEventListener("dblclick", reset);
+    };
+  }, [gl]);
+  useFrame((_, dt) => {
+    if (!g.current) return;
+    g.current.rotation.y = THREE.MathUtils.damp(g.current.rotation.y, target.current.yaw, 8, dt);
+    g.current.rotation.x = THREE.MathUtils.damp(g.current.rotation.x, target.current.pitch, 8, dt);
+  });
+  return <group ref={g}>{children}</group>;
 }
 
 export default function Scene({
@@ -579,7 +744,9 @@ export default function Scene({
         <Lightformer form="rect" intensity={0.6} color="#dfe8e2" position={[0, -3, 0]} scale={[10, 10, 1]} rotation-x={-Math.PI / 2} />
         <Lightformer form="ring" intensity={1.4} color="#ffd9d6" position={[0, 1.5, -6]} scale={4} />
       </Environment>
-      <Device progress={progress} apps={apps} onOpen={onOpen} reduced={reduced} />
+      <Spin>
+        <Device progress={progress} apps={apps} onOpen={onOpen} reduced={reduced} />
+      </Spin>
       <ContactShadows position={[0, -0.001, 0]} opacity={0.85} scale={7} blur={2.2} far={2.5} resolution={1024} color="#000000" />
       <EffectComposer multisampling={4}>
         {/* the white screens are the brightest thing in frame, so they carry the glow */}
