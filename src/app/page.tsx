@@ -1,4 +1,4 @@
-import { Hero } from "@/components/Hero";
+import { HandheldSection } from "@/components/handheld/HandheldSection";
 import { Experience } from "@/components/Experience";
 import { OutOfOffice } from "@/components/OutOfOffice";
 import { Contact } from "@/components/Contact";
@@ -6,7 +6,7 @@ import { Contact } from "@/components/Contact";
 export default function Home() {
   return (
     <main className="w-full bg-white">
-      <Hero />
+      <HandheldSection />
       <Experience />
       <OutOfOffice />
       <Contact />

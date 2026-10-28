@@ -1,5 +1,5 @@
-import { involvements, interests, site } from "@/data/site";
-import { Carousel } from "./Carousel";
+import { involvements, interests } from "@/data/site";
+import { Gallery } from "./Gallery";
 import { NowPlaying } from "./NowPlaying";
 import { Playlists } from "./Playlists";
 import { Reveal } from "./Reveal";
@@ -24,24 +24,11 @@ export function OutOfOffice() {
     </ZoomTitle>
     <section className="bg-sand pb-24 md:pb-32">
       <div className="mx-auto w-full max-w-[1200px] px-5 md:px-8">
-        {/* travel */}
+        {/* gallery: local images only, no embeds */}
         <div className="border-t border-zinc-200 pt-10">
           <Reveal variant="blur">
-            <Heading>Where I&rsquo;ve been</Heading>
-            <Carousel />
-            {site.instagram && (
-              <a
-                href={site.instagram}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group mt-4 inline-flex items-center text-[14px] text-zinc-500 hover:text-forest"
-              >
-                See more
-                <span className="ml-1 inline-block transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </a>
-            )}
+            <Heading>Gallery</Heading>
+            <Gallery />
           </Reveal>
         </div>
 

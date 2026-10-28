@@ -172,50 +172,23 @@ export const site = {
   github: "https://github.com/lag-gam",
   linkedin: "https://www.linkedin.com/in/agamiheanyiigwe",
   resume: "/resume.pdf",
-  instagram: "",
 };
 
-export type MediaItem = {
-  /** file in /public/out-of-office, or an Instagram permalink when type is "instagram" */
-  src: string;
-  type: "image" | "video" | "instagram";
-  /** poster frame for videos — also a file in /public/out-of-office */
-  poster?: string;
-  caption: string;
-  place?: string;
-};
+export type GalleryCategory = "creative" | "technical";
 
 /**
- * Drop photos and clips into /public/out-of-office and list them here.
- * Anything missing from disk is skipped at render time rather than breaking.
+ * The gallery reads straight from /public/gallery/creative and
+ * /public/gallery/technical, sorted by filename (prefix 01-, 02- to order).
+ * Captions are optional: key by filename. Anything without one gets a caption
+ * made from its filename, so "tokyo-japan.jpg" shows as "Tokyo Japan".
  */
-export const gallery: MediaItem[] = [
-  {
-    src: "https://www.instagram.com/p/DWwo83Lj1BI/",
-    type: "instagram",
-    caption: "Yosemite, California",
-  },
-  {
-    src: "https://www.instagram.com/p/DYefCiavsjE/",
-    type: "instagram",
-    caption: "Rio de Janeiro, Brazil",
-  },
-  {
-    src: "https://www.instagram.com/p/DWuxt7EGleq/",
-    type: "instagram",
-    caption: "Rio de Janeiro, Brazil",
-  },
-  {
-    src: "https://www.instagram.com/p/C44T3YJySdw/",
-    type: "instagram",
-    caption: "Tokyo, Japan",
-  },
-  {
-    src: "https://www.instagram.com/p/C9cys4ovSDQ/",
-    type: "instagram",
-    caption: "Seattle, Washington",
-  },
-];
+export const galleryCaptions: Record<string, { caption: string; place?: string }> = {
+  "yosemite.jpg": { caption: "Yosemite", place: "California" },
+  "rio-1.jpg": { caption: "Rio de Janeiro", place: "Brazil" },
+  "rio-2.jpg": { caption: "Rio de Janeiro", place: "Brazil" },
+  "tokyo.jpg": { caption: "Tokyo", place: "Japan" },
+  "seattle.jpg": { caption: "Seattle", place: "Washington" },
+};
 
 export type Involvement = {
   role: string;
@@ -224,7 +197,7 @@ export type Involvement = {
 };
 
 export const involvements: Involvement[] = [
-  { role: "Co-President", org: "NSBE + Black in CS", when: "2023 — Present" },
+  { role: "President", org: "NSBE + Black in CS", when: "2 years running" },
   { role: "Secretary", org: "Alpha Phi Alpha, Nu Sigma Chapter", when: "2026 — Present" },
   { role: "Section Leader", org: "CS106 / CS198", when: "2024 — Present" },
   { role: "Member", org: "Stanford Robotics Club", when: "2023 — Present" },

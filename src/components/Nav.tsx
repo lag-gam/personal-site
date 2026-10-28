@@ -28,7 +28,9 @@ export function Nav() {
       }`}
     >
       <nav className="mx-auto flex h-full max-w-[1200px] items-center gap-7 px-5 md:px-8">
-        <Link href="/" className="mr-auto text-[15px] font-semibold tracking-tight text-ink">
+        <Link href="/" className="mr-auto flex items-center gap-2 text-[15px] font-semibold tracking-tight text-ink">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/feather-mark.svg" alt="" width={22} height={22} className="rounded-[6px]" />
           Agam Iheanyi-Igwe
         </Link>
         {links.map((l) => (
