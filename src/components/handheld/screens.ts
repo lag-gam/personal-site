@@ -37,15 +37,9 @@ const GREEN = "#008751";
 const INK = "#18181b";
 const MUTED = "#71717a";
 const FAINT = "#a1a1aa";
-/** M PLUS 1p: a free Japanese gothic in the spirit of Fontworks Rodin */
-export const FONT_FAMILY = "M PLUS 1p";
-const SANS = `"${FONT_FAMILY}", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
-/** Monocraft (OFL): a pixel font for the Music app */
+/** Monocraft (SIL OFL 1.1): the pixel font used across the whole site */
 export const MONO_FAMILY = "Monocraft";
-const MONO = `"${MONO_FAMILY}", ui-monospace, SFMono-Regular, Menlo, monospace`;
-/** the face every draw call below uses; set per screen, so the Music app can switch to the pixel font */
-let FONT = SANS;
-const faceFor = (apps: App[], view: View) => (view.app >= 0 && apps[view.app]?.id === "music" ? MONO : SANS);
+const FONT = `"${MONO_FAMILY}", ui-monospace, SFMono-Regular, Menlo, monospace`;
 
 /* ---------- helpers ---------- */
 
@@ -351,7 +345,6 @@ function header(ctx: CanvasRenderingContext2D, title: string, right: string) {
 }
 
 export function drawBottom(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img, shots: HTMLCanvasElement[] = []) {
-  FONT = faceFor(apps, view);
   if (view.app >= 0 && apps[view.app]?.kind === "camera") {
     background(ctx);
     header(ctx, "Camera", shots.length ? `${shots.length} taken` : "");
@@ -695,11 +688,15 @@ function detail(ctx: CanvasRenderingContext2D, apps: App[], view: View, img: Img
     y += 70;
   } else y += 30;
   ctx.fillStyle = INK;
-  let tpx = 72;
+  // shrink a little, then wrap to a second line rather than cutting the title off
+  let tpx = 64;
   ctx.font = `700 ${tpx}px ${FONT}`;
-  while (tpx > 44 && ctx.measureText(it.title).width > maxW) ctx.font = `700 ${(tpx -= 4)}px ${FONT}`;
-  ctx.fillText(fit(ctx, it.title, maxW), tx, y);
-  y += 72;
+  while (tpx > 50 && ctx.measureText(it.title).width > maxW) ctx.font = `700 ${(tpx -= 2)}px ${FONT}`;
+  const tlines = wrap(ctx, it.title, maxW);
+  const shown = tlines.slice(0, 2);
+  if (tlines.length > 2) shown[1] = fit(ctx, tlines.slice(1).join(" "), maxW);
+  shown.forEach((l, k) => ctx.fillText(l, tx, y + k * Math.round(tpx * 1.12)));
+  y += 72 + (shown.length - 1) * Math.round(tpx * 1.12);
   if (it.subtitle) {
     ctx.fillStyle = MUTED;
     ctx.font = `500 40px ${FONT}`;
@@ -808,7 +805,6 @@ export function drawTop(
   cam?: Cam,
   tagline: { text: string; caret: boolean } = { text: "", caret: false }
 ): number {
-  FONT = faceFor(apps, view);
   if (view.app >= 0 && apps[view.app]?.kind === "camera") {
     drawCamera(ctx, cam);
     return 1;

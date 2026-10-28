@@ -15,9 +15,8 @@
 }
 
 @theme inline {
-  /* M PLUS 1p: a free Japanese gothic in the spirit of Fontworks Rodin */
-  --font-sans: "M PLUS 1p", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, Helvetica, Arial, sans-serif;
+  /* Monocraft everywhere (declared at the top of this file) */
+  --font-sans: "Monocraft", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
   --color-forest: #14532d;
