@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { ContactShadows, Environment, Lightformer, RoundedBox } from "@react-three/drei";
+import { Environment, Lightformer, RoundedBox } from "@react-three/drei";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { MotionValue } from "motion/react";
@@ -747,7 +747,8 @@ export default function Scene({
       <Spin>
         <Device progress={progress} apps={apps} onOpen={onOpen} reduced={reduced} />
       </Spin>
-      <ContactShadows position={[0, -0.001, 0]} opacity={0.85} scale={7} blur={2.2} far={2.5} resolution={1024} color="#000000" />
+      {/* no ground shadow: it's a flat sheet at floor level, and tilting the device pushed parts of it
+          through the sheet, which darkened them along a hard line. On a black stage it showed nothing anyway. */}
       <EffectComposer multisampling={4}>
         {/* the white screens are the brightest thing in frame, so they carry the glow */}
         <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.08} intensity={0.32} radius={0.55} />
